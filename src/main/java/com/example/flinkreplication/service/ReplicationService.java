@@ -1,54 +1,62 @@
 package com.example.flinkreplication.service;
 
-import com.example.flinkreplication.dto.TableData;
-import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.example.flinkreplication.flink.MetadataExtractorByDatabase;
+import com.example.flinkreplication.properties.*;
+import lombok.RequiredArgsConstructor;
+import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.io.jdbc.JDBCOutputFormat;
+import org.apache.flink.api.java.typeutils.RowTypeInfo;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.util.List;
-import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 public class ReplicationService {
 
-    @Autowired
-    private StreamExecutionEnvironment flinkEnv;
-
-    @Autowired
-    private DatabaseConnectionService dbConnectionService;
-
-    @Autowired
-    private Map<String, JdbcTemplate> sourceJdbcTemplates;
-
-    @Autowired
-    private JdbcTemplate targetJdbcTemplate;
-
-    private static final String[] TABLES_TO_REPLICATE = {"table1", "table2", "table3", "table4"};
+    private final ExecutionEnvironment env;
+    private final TargetDateBaseProperty targetDateBaseProperty;
+    private final PostgresTablesProperties postgresProperties;
+    private final SourceDatabasesProperties sourceDatabasesProperties;
+    private final FlinkProperty flinkProperty;
 
     public void startReplication() throws Exception {
-        for (String tableName : TABLES_TO_REPLICATE) {
-            DataStream<TableData> tableDataStream = flinkEnv
-                    .fromCollection(sourceJdbcTemplates.keySet())
-                    .flatMap((String dbName, org.apache.flink.util.Collector<TableData> out) -> {
-                        JdbcTemplate sourceJdbc = sourceJdbcTemplates.get(dbName);
-                        List<Map<String, Object>> rows = dbConnectionService.fetchTableData(sourceJdbc, tableName);
+        env.setParallelism(flinkProperty.getParallelism() > 0 ? flinkProperty.getParallelism() : 1);
 
-                        for (Map<String, Object> row : rows) {
-                            out.collect(new TableData(tableName, dbName, row));
-                        }
-                    });
+        List<String> tablesToReplicate = postgresProperties.getTables();
+        List<SourceDbProperties> activeSources = sourceDatabasesProperties.getInfo().stream()
+                .filter(SourceDbProperties::isActive).toList();
 
-            tableDataStream.addSink(new SinkFunction<TableData>() {
-                @Override
-                public void invoke(TableData value, Context context) throws Exception {
-                    dbConnectionService.insertData(targetJdbcTemplate, value.getTableName(), value.getData());
-                }
-            });
-        }
+        RowTypeInfo rowTypeInfo = new RowTypeInfo(
+                TypeInformation.of(String.class),
+                TypeInformation.of(String.class),
+                TypeInformation.of(String.class),
+                TypeInformation.of(Timestamp.class)
+        );
 
-        flinkEnv.execute("PostgreSQL Tables Replication");
+        var rowsDS = env.fromCollection(activeSources)
+                .flatMap(new MetadataExtractorByDatabase(tablesToReplicate, flinkProperty.getMaxRetries(), flinkProperty.getRetryDelayMs()))
+                .returns(rowTypeInfo);
+
+        rowsDS.output(
+                JDBCOutputFormat.buildJDBCOutputFormat()
+                        .setDrivername("org.postgresql.Driver")
+                        .setDBUrl(targetDateBaseProperty.getUrl())
+                        .setUsername(targetDateBaseProperty.getUsername())
+                        .setPassword(targetDateBaseProperty.getPassword())
+                        .setQuery("INSERT INTO metadata (data_source, table_name, data, updated_at) VALUES (?, ?, ?::jsonb, ?)")
+                        .setSqlTypes(new int[]{
+                                Types.VARCHAR,   // источник бд
+                                Types.VARCHAR,   // имя системной таблицы
+                                Types.VARCHAR,   // строка из таблицы в виде json
+                                Types.TIMESTAMP  // дата последнего обновления
+                        })
+                        .finish()
+        );
+
+        env.execute("Replicate metadata to unified metadata table");
     }
 }

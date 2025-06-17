@@ -1,5 +1,6 @@
 package com.example.flinkreplication.config;
-//Конфигурация Flink
+
+import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -8,7 +9,11 @@ import org.springframework.context.annotation.Configuration;
 public class FlinkConfig {
 
     @Bean
-    public StreamExecutionEnvironment flinkExecutionEnvironment() {
+    public StreamExecutionEnvironment streamExecutionEnvironment() {
         return StreamExecutionEnvironment.getExecutionEnvironment();
+    }
+    @Bean
+    public ExecutionEnvironment executionEnvironment() {
+        return ExecutionEnvironment.getExecutionEnvironment();
     }
 }
