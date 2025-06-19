@@ -841,7 +841,7 @@ replication:
 
   postgres:
     tables:
-      - pg_stat_statements
+#      - pg_stat_statements
       - pg_catalog.pg_database
       - pg_catalog.pg_user
       - pg_catalog.pg_class
