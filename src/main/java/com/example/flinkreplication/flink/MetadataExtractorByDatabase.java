@@ -34,10 +34,12 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
     @Override
     public void flatMap(SourceDbProperties source, Collector<Row> collector) {
         Connection conn = null;
+        Timestamp currentTimestamp = Timestamp.valueOf(LocalDateTime.now());
+
         try {
             conn = connectWithRetries(source);
             for (String tableName : tables) {
-                processTable(conn, source, tableName, collector);
+                processTable(conn, source, tableName, collector, currentTimestamp);
             }
         } catch (Exception e) {
             log.error("Failed to extract metadata for DB {}: {}", source.getName(), e.getMessage(), e);
@@ -63,7 +65,7 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
         throw new RuntimeException("Unexpected failure connecting to DB " + source.getName());
     }
 
-    private void processTable(Connection conn, SourceDbProperties source, String tableName, Collector<Row> collector) {
+    private void processTable(Connection conn, SourceDbProperties source, String tableName, Collector<Row> collector, Timestamp currentTimestamp) {
         String sql = "SELECT * FROM " + tableName;
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {

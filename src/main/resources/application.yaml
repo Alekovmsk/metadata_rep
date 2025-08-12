@@ -4,33 +4,41 @@ spring:
   application:
     name: flink-replication-service
   datasource:
-      url: jdbc:postgresql://localhost:5432/target_db
-      username: postgres
-      password: kampus
-      hikari:
-        maximum-pool-size: 20
-        connection-timeout: 30000
-        idle-timeout: 600000
-        max-lifetime: 1800000
-        pool-name: TargetDBPool
+    url: jdbc:postgresql://localhost:5432/target_db?currentSchema=postgres_metadata
+    username: postgres
+    password: kampus
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: TargetDBPool
+
+  logs-database:
+    datasource:
+      url: jdbc:postgresql://logs-db-host:5432/logs_db
+      username: logs_user
+      password: logs_pass
+      driver-class-name: org.postgresql.Driver
 
   flyway:
     enabled: true
     baseline-on-migrate: true
     locations: classpath:db/migration
 
+
 management:
   endpoints:
     web:
       exposure:
         include: health,metrics,info
-  endpoint:
-    health:
-      show-details: always
-  metrics:
-    export:
-      prometheus:
-        enabled: true
+    endpoint:
+      health:
+        show-details: always
+    metrics:
+      export:
+        prometheus:
+          enabled: true
 
 replication:
   enabled: true
@@ -861,7 +869,7 @@ replication:
       - pg_catalog.pg_enum
 
     target-date-base-property:
-      url: jdbc:postgresql://localhost:5432/target_db
+      url: jdbc:postgresql://localhost:5432/target_db?currentSchema=postgres_metadata
       username: postgres
       password: kampus
 
@@ -883,6 +891,15 @@ flink:
         delay: 10000
     buffer-timeout: 100
     watermark-interval: 10000
+
+logs-database:
+  enabled: true
+  task-create-partition: 0 0 0 * * ?
+clean-database-logs:
+# cron expression, to switch off put value '-'
+  task-cleaner-schedule: 0 0 0 * * ?
+# delete logs from db that older than X years
+  clean-period: 3
 
 logging:
   level:
