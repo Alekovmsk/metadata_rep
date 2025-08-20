@@ -1,6 +1,6 @@
 package com.example.flinkreplication.flink;
 
-import com.example.flinkreplication.properties.SourceDbProperties;
+import com.example.flinkreplication.dto.SourceDbConnections;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 @RequiredArgsConstructor
-public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProperties, Row> {
+public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbConnections, Row> {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataExtractorByDatabase.class);
 
@@ -32,7 +32,7 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public void flatMap(SourceDbProperties source, Collector<Row> collector) {
+    public void flatMap(SourceDbConnections source, Collector<Row> collector) {
         Connection conn = null;
         Timestamp currentTimestamp = Timestamp.valueOf(LocalDateTime.now());
 
@@ -42,30 +42,30 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
                 processTable(conn, source, tableName, collector, currentTimestamp);
             }
         } catch (Exception e) {
-            log.error("Failed to extract metadata for DB {}: {}", source.getName(), e.getMessage(), e);
+            log.error("Не удалось извлечь метаданные для БД {}: {}", source.getName(), e.getMessage(), e);
         } finally {
             closeQuietly(conn);
         }
     }
 
-    private Connection connectWithRetries(SourceDbProperties source) throws InterruptedException {
+    private Connection connectWithRetries(SourceDbConnections source) throws InterruptedException {
         int attempt = 0;
         while (attempt < maxRetries) {
             try {
                 return DriverManager.getConnection(source.getUrl(), source.getUsername(), source.getPassword());
             } catch (SQLException e) {
                 attempt++;
-                log.warn("Connection attempt {}/{} failed for DB {}: {}", attempt, maxRetries, source.getName(), e.getMessage());
+                log.warn("Попытка подключения {}/{} не удалась для БД {}: {}", attempt, maxRetries, source.getName(), e.getMessage());
                 if (attempt >= maxRetries) {
-                    throw new RuntimeException("Max retries reached for DB " + source.getName(), e);
+                    throw new RuntimeException("Достигнут предел попыток подключения к БД " + source.getName(), e);
                 }
                 Thread.sleep(retryDelayMs);
             }
         }
-        throw new RuntimeException("Unexpected failure connecting to DB " + source.getName());
+        throw new RuntimeException("Неожиданная ошибка подключения к БД " + source.getName());
     }
 
-    private void processTable(Connection conn, SourceDbProperties source, String tableName, Collector<Row> collector, Timestamp currentTimestamp) {
+    private void processTable(Connection conn, SourceDbConnections source, String tableName, Collector<Row> collector, Timestamp currentTimestamp) {
         String sql = "SELECT * FROM " + tableName;
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
@@ -92,7 +92,7 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
             }
 
         } catch (SQLException | JsonProcessingException e) {
-            log.error("Error querying table {} from DB {}: {}", tableName, source.getName(), e.getMessage(), e);
+            log.error("Ошибка при выполнении запроса к таблице {} из БД {}: {}", tableName, source.getName(), e.getMessage(), e);
         }
     }
 
@@ -102,21 +102,21 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
                 Object[] arr = (Object[]) array.getArray();
                 return Arrays.asList(arr);
             } catch (SQLException e) {
-                log.warn("Failed to read SQL Array: {}", e.getMessage());
-                return "[UNREADABLE ARRAY]";
+                log.warn("Ошибка при чтении SQL Array: {}", e.getMessage());
+                return "[НЕЧИТАЕМЫЙ ARRAY]";
             }
         } else if (value instanceof Clob clob) {
             try {
                 return clob.getSubString(1, (int) clob.length());
             } catch (SQLException e) {
-                log.warn("Failed to read CLOB: {}", e.getMessage());
-                return "[UNREADABLE CLOB]";
+                log.warn("Ошибка при чтении CLOB: {}", e.getMessage());
+                return "[НЕЧИТАЕМЫЙ CLOB]";
             }
         } else if (value instanceof Blob blob) {
             try {
-                return "[BLOB " + blob.length() + " bytes]";
+                return "[BLOB " + blob.length() + " байт]";
             } catch (SQLException e) {
-                return "[UNREADABLE BLOB]";
+                return "[НЕЧИТАЕМЫЙ BLOB]";
             }
         } else if (value instanceof Struct struct) {
             return struct.toString();
@@ -131,7 +131,7 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbProp
             try {
                 ac.close();
             } catch (Exception e) {
-                log.warn("Error closing resource: {}", e.getMessage());
+                log.warn("Ошибка при закрытии ресурса: {}", e.getMessage());
             }
         }
     }

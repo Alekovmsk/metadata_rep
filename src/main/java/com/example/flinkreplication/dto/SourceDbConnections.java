@@ -1,4 +1,4 @@
-package com.example.flinkreplication.properties;
+package com.example.flinkreplication.dto;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -7,7 +7,7 @@ import java.io.Serializable;
 
 @Getter
 @Setter
-public class SourceDbProperties implements Serializable {
+public class SourceDbConnections implements Serializable {
     private String name;
     private String url;
     private String username;
