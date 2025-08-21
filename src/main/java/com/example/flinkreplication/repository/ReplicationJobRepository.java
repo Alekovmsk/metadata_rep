@@ -1,9 +1,8 @@
 package com.example.flinkreplication.repository;
 
-import com.example.flinkreplication.ReplicationJobStatus;
+import com.example.flinkreplication.enums.ReplicationJobStatus;
 import com.example.flinkreplication.model.ReplicationJob;
 import jakarta.persistence.LockModeType;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;

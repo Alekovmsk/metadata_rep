@@ -1,6 +1,6 @@
 package com.example.flinkreplication.model;
 
-import com.example.flinkreplication.ReplicationJobStatus;
+import com.example.flinkreplication.enums.ReplicationJobStatus;
 import jakarta.persistence.*;
 import lombok.*;
 

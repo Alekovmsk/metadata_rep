@@ -1,7 +1,7 @@
 package com.example.flinkreplication.service.impl;
 
 
-import com.example.flinkreplication.ReplicationJobStatus;
+import com.example.flinkreplication.enums.ReplicationJobStatus;
 import com.example.flinkreplication.dto.ReplicationRequestDto;
 import com.example.flinkreplication.model.ReplicationJob;
 import com.example.flinkreplication.repository.ReplicationJobRepository;

@@ -1,6 +1,6 @@
 package com.example.flinkreplication.service.impl;
 
-import com.example.flinkreplication.ReplicationJobStatus;
+import com.example.flinkreplication.enums.ReplicationJobStatus;
 import com.example.flinkreplication.dto.SourceDbConnections;
 import com.example.flinkreplication.flink.MetadataExtractorByDatabase;
 import com.example.flinkreplication.model.ReplicationJob;
@@ -24,7 +24,6 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
