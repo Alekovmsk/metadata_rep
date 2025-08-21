@@ -1,6 +1,5 @@
 package com.example.flinkreplication.config;
 
-import com.esotericsoftware.kryo.serializers.TaggedFieldSerializer;
 import com.example.flinkreplication.dto.ReplicationRequestDto;
 import com.example.flinkreplication.service.ReplicationJobService;
 import com.example.flinkreplication.service.impl.ReplicationServiceImpl;
@@ -19,8 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @Tag(name = "Persons", description = "API управления пользвателями ")
 public class ReplicationController {
-
-    private final ReplicationServiceImpl replicationService;
     private final ReplicationJobService replicationJobService;
 
     @PostMapping("/job/add")

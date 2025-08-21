@@ -1,5 +1,4 @@
-{
-  "databases": [
+[
     {
       "name": "source_db_1",
       "url": "jdbc:postgresql://localhost:5432/source_db_1",
@@ -136,4 +135,3 @@
       "active": true
     }
   ]
-}

@@ -1,6 +1,7 @@
 package com.example.flinkreplication.service.impl;
 
 
+import com.example.flinkreplication.ReplicationJobStatus;
 import com.example.flinkreplication.dto.ReplicationRequestDto;
 import com.example.flinkreplication.model.ReplicationJob;
 import com.example.flinkreplication.repository.ReplicationJobRepository;
@@ -23,7 +24,7 @@ public class ReplicationJobServiceImpl implements ReplicationJobService {
 
         ReplicationJob job = ReplicationJob.builder()
                 .dbName(dbName)
-                .status("PENDING")
+                .status(ReplicationJobStatus.PENDING)
                 .build();
 
         replicationJobRepository.save(job);

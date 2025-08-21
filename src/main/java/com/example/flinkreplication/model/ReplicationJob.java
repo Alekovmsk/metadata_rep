@@ -1,5 +1,6 @@
 package com.example.flinkreplication.model;
 
+import com.example.flinkreplication.ReplicationJobStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,7 +23,8 @@ public class ReplicationJob {
     private String dbName;
 
     @Column(name = "status", nullable = false)
-    private String status; // PENDING, RUNNING, DONE, FAILED
+    @Enumerated(EnumType.STRING)
+    private ReplicationJobStatus status; // PENDING, RUNNING, DONE, FAILED
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -35,7 +37,7 @@ public class ReplicationJob {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (status == null) {
-            status = "PENDING";
+            status = ReplicationJobStatus.PENDING;
         }
     }
 

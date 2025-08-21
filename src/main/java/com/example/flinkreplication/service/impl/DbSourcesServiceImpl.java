@@ -10,6 +10,7 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -17,21 +18,18 @@ import java.util.List;
 @RequiredArgsConstructor
 public class DbSourcesServiceImpl implements DbSourcesService {
 
-    private final ObjectMapper objectMapper;
-    private List<SourceDbConnections> dbConnections;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @PostConstruct
-    public void init() {
+    @Override
+    public List<SourceDbConnections> getDbConnections() {
+        List<SourceDbConnections> dbConnections = new ArrayList<>();
+
         try (var is = new ClassPathResource("db-connections.json").getInputStream()) {
             dbConnections = objectMapper.readValue(is, new TypeReference<List<SourceDbConnections>>() {});
         } catch (IOException e) {
             // Если файл не найден или ошибка чтения, создаём пустой объект
             dbConnections = Collections.emptyList();
         }
-    }
-
-    @Override
-    public List<SourceDbConnections> getDbConnections() {
         return dbConnections;
     }
 }

@@ -1,5 +1,6 @@
 package com.example.flinkreplication.repository;
 
+import com.example.flinkreplication.ReplicationJobStatus;
 import com.example.flinkreplication.model.ReplicationJob;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -16,9 +17,8 @@ public interface ReplicationJobRepository extends JpaRepository<ReplicationJob, 
 
     List<ReplicationJob> findByStatus(String status);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE) // чтобы никто параллельно не взял те же задания
-    @Query("SELECT j FROM ReplicationJob j WHERE j.status = 'PENDING' ORDER BY j.createdAt")
-    List<ReplicationJob> findPendingJobs(Pageable pageable);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<ReplicationJob> findByStatusOrderByCreatedAt(ReplicationJobStatus status);
 
     @Query("SELECT rj FROM ReplicationJob rj")
     Set<ReplicationJob> findAllJob();
