@@ -7,7 +7,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "replication_jobs")
+@Table(name = "replication_jobs", schema = "postgres_metadata")
 @Getter
 @Setter
 @Builder

@@ -2,7 +2,6 @@ package com.example.flinkreplication.config;
 
 import com.example.flinkreplication.dto.ReplicationRequestDto;
 import com.example.flinkreplication.service.ReplicationJobService;
-import com.example.flinkreplication.service.impl.ReplicationServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

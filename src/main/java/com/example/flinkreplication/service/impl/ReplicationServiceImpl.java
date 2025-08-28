@@ -3,6 +3,8 @@ package com.example.flinkreplication.service.impl;
 import com.example.flinkreplication.enums.ReplicationJobStatus;
 import com.example.flinkreplication.dto.SourceDbConnections;
 import com.example.flinkreplication.flink.MetadataExtractorByDatabase;
+import com.example.flinkreplication.log.SvoiCustomLogger;
+import com.example.flinkreplication.log.SvoiSeverityEnum;
 import com.example.flinkreplication.model.ReplicationJob;
 import com.example.flinkreplication.properties.*;
 import com.example.flinkreplication.repository.ReplicationJobRepository;
@@ -38,6 +40,7 @@ public class ReplicationServiceImpl implements ReplicationService {
     private final FlinkProperty flinkProperty;
     private final ReplicationJobRepository jobRepository;
     private final DbSourcesService dbSourcesService;
+    private final SvoiCustomLogger svoiCustomLogger;
 
     @Scheduled(fixedDelay = 60000)
     @Transactional
@@ -109,6 +112,24 @@ public class ReplicationServiceImpl implements ReplicationService {
                             .map(SourceDbConnections::getName)
                             .collect(Collectors.joining(", "))
             ));
+
+            String replicatedSources = sourceDbCForReplication.stream()
+                    .map(SourceDbConnections::getName)
+                    .collect(Collectors.joining(", "));
+
+            String notFoundSources = sourceDbNotFound.stream()
+                    .map(SourceDbConnections::getName)
+                    .collect(Collectors.joining(", "));
+
+            svoiCustomLogger.send(
+                    "replicationJob",
+                    "Replication Finished",
+                    String.format("Replicated sources: [%s]; Not found: [%s]; Tables: [%s]",
+                            replicatedSources,
+                            notFoundSources.isEmpty() ? "none" : notFoundSources,
+                            String.join(", ", tablesToReplicate)),
+                    SvoiSeverityEnum.ONE
+            );
         }
     }
 

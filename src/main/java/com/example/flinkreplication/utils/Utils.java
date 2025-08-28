@@ -13,6 +13,7 @@ public class Utils {
     public static final String CONSENTS_CACHE_PROPERTY = "consents";
     public static final String CONSOLIDATED_CONSENTS_CACHE_PROPERTY = "consolidatedConsents";
     public static final String CLIENT_CONSENT_REFS_CACHE_PROPERTY = "clientConsentRefs";
+
     public static String getHash(String input, String algorithm) {
         try {
             MessageDigest messageDigest = MessageDigest.getInstance(algorithm);

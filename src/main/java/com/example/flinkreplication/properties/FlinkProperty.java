@@ -13,5 +13,4 @@ public class FlinkProperty {
     private int parallelism;           // количество потоков одновременных
     private int maxRetries = 3;        // количество повторных попыток подключения
     private long retryDelayMs = 1000;  // задержка между попытками в миллисекундах
-    private String cron;               // время запусков флинк джобы
 }

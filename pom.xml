@@ -166,28 +166,6 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-core</artifactId>
-            <version>2.15.0</version> <!-- или последняя совместимая версия -->
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-calcite</artifactId>
-            <version>2.15.0</version> <!-- или совместимую с твоей версией ignite-core -->
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-indexing</artifactId>
-            <version>2.15.0</version> <!-- или твоя текущая версия Ignite -->
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.ignite</groupId>
-            <artifactId>ignite-core</artifactId>
-            <version>2.15.0</version>
-        </dependency>
-
-        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
             <version>4.1.100.Final</version>
