@@ -9,21 +9,26 @@ import org.apache.flink.types.Row;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.DigestUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbConnections, Row> {
 
     private static final Logger log = LoggerFactory.getLogger(MetadataExtractorByDatabase.class);
 
-    private static final int ROW_FIELD_COUNT = 4;
+    private static final int ROW_FIELD_COUNT = 6;
     private static final int IDX_SOURCE_NAME = 0;
     private static final int IDX_TABLE_NAME = 1;
-    private static final int IDX_DATA_JSON = 2;
-    private static final int IDX_TIMESTAMP = 3;
+    private static final int IDX_RECORD_KEY  = 2;
+    private static final int IDX_DATA_JSON   = 3;
+    private static final int IDX_DATA_HASH   = 4;
+    private static final int IDX_TIMESTAMP   = 5;
 
     private final List<String> tables;
     private final int maxRetries;
@@ -65,7 +70,8 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbConn
         throw new RuntimeException("Неожиданная ошибка подключения к БД " + source.getName());
     }
 
-    private void processTable(Connection conn, SourceDbConnections source, String tableName, Collector<Row> collector, Timestamp currentTimestamp) {
+    private void processTable(Connection conn, SourceDbConnections source, String tableName,
+                              Collector<Row> collector, Timestamp currentTimestamp) {
         String sql = "SELECT * FROM " + tableName;
         try (PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
@@ -82,11 +88,25 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbConn
                     rowMap.put(columnName, value);
                 }
 
-                Row flinkRow = new Row(ROW_FIELD_COUNT);
-                flinkRow.setField(IDX_SOURCE_NAME, source.getName());
-                flinkRow.setField(IDX_TABLE_NAME, tableName);
-                flinkRow.setField(IDX_DATA_JSON, objectMapper.writeValueAsString(rowMap));
-                flinkRow.setField(IDX_TIMESTAMP, Timestamp.valueOf(LocalDateTime.now()));
+                // ⚡ Добавляем data_source в map, чтобы ключ был полным
+                rowMap.put("data_source", source.getName());
+
+                // JSON строки
+                String jsonData = objectMapper.writeValueAsString(rowMap);
+
+                // record_key — формируем стабильный ключ для всех типов системных таблиц
+                String recordKey = buildRecordKey(rowMap);
+
+                // data_hash — SHA256 от jsonData
+                String dataHash = DigestUtils.md5DigestAsHex(jsonData.getBytes(StandardCharsets.UTF_8));
+
+                Row flinkRow = new Row(6);
+                flinkRow.setField(0, source.getName());   // data_source
+                flinkRow.setField(1, tableName);          // table_name
+                flinkRow.setField(2, recordKey);          // record_key
+                flinkRow.setField(3, dataHash);           // MD5
+                flinkRow.setField(4, jsonData);           // JSON
+                flinkRow.setField(5, currentTimestamp);   // updated_at
 
                 collector.collect(flinkRow);
             }
@@ -94,6 +114,55 @@ public class MetadataExtractorByDatabase implements FlatMapFunction<SourceDbConn
         } catch (SQLException | JsonProcessingException e) {
             log.error("Ошибка при выполнении запроса к таблице {} из БД {}: {}", tableName, source.getName(), e.getMessage(), e);
         }
+    }
+
+    private String buildRecordKey(Map<String, Object> rowMap) {
+        String recordKey;
+
+        // Колонки таблиц
+        if (rowMap.containsKey("table_name") && rowMap.containsKey("column_name")) {
+            recordKey = String.join("|",
+                    safe(rowMap.get("data_source")),
+                    safe(rowMap.get("table_schema")),
+                    safe(rowMap.get("table_name")),
+                    safe(rowMap.get("column_name"))
+            );
+        }
+        // pg_attribute (системные колонки)
+        else if (rowMap.containsKey("attrelid") && rowMap.containsKey("attnum")) {
+            recordKey = String.join("|",
+                    safe(rowMap.get("data_source")),
+                    safe(rowMap.get("attrelid")),
+                    safe(rowMap.get("attnum"))
+            );
+        }
+        // pg_class (таблицы/индексы)
+        else if (rowMap.containsKey("oid") && rowMap.containsKey("relname")) {
+            recordKey = String.join("|",
+                    safe(rowMap.get("data_source")),
+                    safe(rowMap.get("oid")),
+                    safe(rowMap.get("relname"))
+            );
+        }
+        // pg_database
+        else if (rowMap.containsKey("datname")) {
+            recordKey = String.join("|",
+                    safe(rowMap.get("data_source")),
+                    safe(rowMap.get("datname"))
+            );
+        }
+        // fallback — все значения конкатенируем (на крайний случай)
+        else {
+            recordKey = rowMap.values().stream()
+                    .map(this::safe)
+                    .collect(Collectors.joining("|"));
+        }
+
+        return recordKey;
+    }
+
+    private String safe(Object value) {
+        return value != null ? value.toString() : "NULL";
     }
 
     private Object convertJdbcValue(Object value) {

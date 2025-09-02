@@ -55,9 +55,8 @@ public class ReplicationServiceImpl implements ReplicationService {
 
     public void startReplication() {
         env.setParallelism(flinkProperty.getParallelism() > 0 ? flinkProperty.getParallelism() : 1);
-        // список которые поидут на репликацию
+
         List<SourceDbConnections> sourceDbCForReplication = new ArrayList<>();
-        // список которые не были найденны в источниках для репликации
         List<SourceDbConnections> sourceDbNotFound = new ArrayList<>();
 
         Map<String, SourceDbConnections> dbConnectionsMap = dbSourcesService.getDbConnections()
@@ -69,25 +68,23 @@ public class ReplicationServiceImpl implements ReplicationService {
 
         List<ReplicationJob> pendingJobs = jobRepository.findByStatusOrderByCreatedAt(ReplicationJobStatus.PENDING);
 
-        pendingJobs
-                .forEach(job -> {
-                    if (dbConnectionsMap.containsKey(job.getDbName())) {
-                        sourceDbCForReplication.add(dbConnectionsMap.get(job.getDbName()));
-                        job.setStatus(ReplicationJobStatus.RUNNING);
-                    } else {
-                        sourceDbNotFound.add(dbConnectionsMap.get(job.getDbName()));
-                        job.setStatus(ReplicationJobStatus.FAILED);
-                    }
-                });
+        pendingJobs.forEach(job -> {
+            if (dbConnectionsMap.containsKey(job.getDbName())) {
+                sourceDbCForReplication.add(dbConnectionsMap.get(job.getDbName()));
+                job.setStatus(ReplicationJobStatus.RUNNING);
+            } else {
+                sourceDbNotFound.add(dbConnectionsMap.get(job.getDbName()));
+                job.setStatus(ReplicationJobStatus.FAILED);
+            }
+        });
 
-        // список системных таблиц для репликации
         List<String> tablesToReplicate = postgresProperties.getTables();
 
         if (!sourceDbCForReplication.isEmpty()) {
-            log.info(String.format("Полученно из очереди %s источников", sourceDbCForReplication.size()));
+            log.info("Полученно из очереди {} источников", sourceDbCForReplication.size());
         }
         if (!sourceDbNotFound.isEmpty()) {
-            log.info(String.format("Не найденно данных по %s источникам для репликации", sourceDbCForReplication.size()));
+            log.info("Не найденно данных по {} источникам для репликации", sourceDbNotFound.size());
         }
         if (tablesToReplicate.isEmpty()) {
             log.info("Не получен список системных таблиц");
@@ -95,23 +92,24 @@ public class ReplicationServiceImpl implements ReplicationService {
 
         jobRepository.saveAll(pendingJobs);
 
+        // теперь у нас 6 колонок: data_source, table_name, record_key, data_hash, data, updated_at
         RowTypeInfo rowTypeInfo = new RowTypeInfo(
-                TypeInformation.of(String.class),
-                TypeInformation.of(String.class),
-                TypeInformation.of(String.class),
-                TypeInformation.of(Timestamp.class)
+                TypeInformation.of(String.class),    // data_source
+                TypeInformation.of(String.class),    // table_name
+                TypeInformation.of(String.class),    // record_key
+                TypeInformation.of(String.class),    // data_hash
+                TypeInformation.of(String.class),    // data (json)
+                TypeInformation.of(Timestamp.class)  // updated_at
         );
-
 
         if (!sourceDbCForReplication.isEmpty()) {
             run(rowTypeInfo, tablesToReplicate, sourceDbCForReplication);
 
-            log.info(String.format(
-                    "Репликация завершена успешно для источников : %s",
+            log.info("Репликация завершена успешно для источников : {}",
                     sourceDbCForReplication.stream()
                             .map(SourceDbConnections::getName)
                             .collect(Collectors.joining(", "))
-            ));
+            );
 
             String replicatedSources = sourceDbCForReplication.stream()
                     .map(SourceDbConnections::getName)
@@ -145,15 +143,54 @@ public class ReplicationServiceImpl implements ReplicationService {
                         .setDBUrl(dataSourceProperties.getUrl())
                         .setUsername(dataSourceProperties.getUsername())
                         .setPassword(dataSourceProperties.getPassword())
-                        .setQuery("INSERT INTO metadata (data_source, table_name, data, updated_at) VALUES (?, ?, ?::jsonb, ?)")
+                        .setQuery(
+                                "INSERT INTO metadata " +
+                                        "(data_source, table_name, record_key, data_hash, data, updated_at) " +
+                                        "VALUES (?, ?, ?, ?, ?::jsonb, ?) " +
+                                        "ON CONFLICT (data_source, table_name, record_key) DO UPDATE SET " +
+                                        "    data_hash  = EXCLUDED.data_hash, " +
+                                        "    data       = EXCLUDED.data, " +
+                                        "    updated_at = EXCLUDED.updated_at " +
+                                        "WHERE metadata.data_hash IS DISTINCT FROM EXCLUDED.data_hash"
+                        )
                         .setSqlTypes(new int[]{
-                                Types.VARCHAR,   // источник бд
-                                Types.VARCHAR,   // имя системной таблицы
-                                Types.VARCHAR,   // строка из таблицы в виде json
-                                Types.TIMESTAMP  // дата последнего обновления
+                                Types.VARCHAR,   // data_source
+                                Types.VARCHAR,   // table_name
+                                Types.VARCHAR,   // record_key
+                                Types.VARCHAR,   // data_hash
+                                Types.OTHER,   // data (JSONB)
+                                Types.TIMESTAMP  // updated_at
                         })
                         .finish()
         );
+
+//        rowsDS.output(
+//                JDBCOutputFormat.buildJDBCOutputFormat()
+//                        .setDrivername("org.postgresql.Driver")
+//                        .setDBUrl(dataSourceProperties.getUrl())
+//                        .setUsername(dataSourceProperties.getUsername())
+//                        .setPassword(dataSourceProperties.getPassword())
+//                        .setQuery(
+//                                "INSERT INTO public.metadata (data_source, table_name, record_key, data_hash, data, updated_at) " +
+//                                        "VALUES (?, ?, ?, ?, ?::jsonb, ?) " +
+//                                        "ON CONFLICT (data_source, table_name, record_key) " +
+//                                        "DO UPDATE SET " +
+//                                        "    data_hash   = EXCLUDED.data_hash, " +
+//                                        "    data        = EXCLUDED.data, " +
+//                                        "    updated_at  = EXCLUDED.updated_at " +
+//                                        "WHERE metadata.data_hash IS DISTINCT FROM EXCLUDED.data_hash"
+//                        )
+//                        .setSqlTypes(new int[]{
+//                                Types.VARCHAR,   // data_source
+//                                Types.VARCHAR,   // table_name
+//                                Types.VARCHAR,   // record_key
+//                                Types.VARCHAR,   // data_hash
+//                                Types.OTHER,   // data (JSONB)
+//                                Types.TIMESTAMP  // updated_at
+//                        })
+//                        .finish()
+//        );
+
 
         try {
             env.execute("Репликация метаданных в единую таблицу метаданных");
