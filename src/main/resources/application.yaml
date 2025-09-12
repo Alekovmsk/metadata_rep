@@ -39,7 +39,7 @@ spring:
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/logs_db
+  url: jdbc:postgresql://localhost:5432/log_db
   username: postgres
   password: kampus
   driverClassName: org.postgresql.Driver
@@ -77,18 +77,18 @@ replication:
       - pg_catalog.pg_user
       - pg_catalog.pg_class
       - pg_catalog.pg_namespace
-      - pg_partitioned_table
+      - pg_catalog.pg_partitioned_table
       - information_schema.columns
       - information_schema.tables
-      - pg_policy
+      - pg_catalog.pg_policy
       - pg_catalog.pg_description
       - pg_catalog.pg_sequence
       - pg_catalog.pg_attrdef
       - pg_catalog.pg_attribute
       - pg_catalog.pg_type
-      - pg_index
+      - pg_catalog.pg_index
       - pg_catalog.pg_constraint
-      - pg_am
+      - pg_catalog.pg_am
       - pg_catalog.pg_enum
 
 flink:

@@ -5,6 +5,7 @@ import org.apache.flink.api.java.typeutils.RowTypeInfo;
 
 import java.util.List;
 
-public interface ReplicationService {
-    void run(RowTypeInfo rowTypeInfo, List<String> tablesToReplicate, List<SourceDbConnections> activeSources);
+public interface
+ReplicationService {
+   // void run(RowTypeInfo rowTypeInfo, List<String> tablesToReplicate, List<SourceDbConnections> activeSources);
 }

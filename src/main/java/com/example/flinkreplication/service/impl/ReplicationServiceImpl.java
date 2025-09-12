@@ -95,15 +95,19 @@ public class ReplicationServiceImpl implements ReplicationService {
         // теперь у нас 6 колонок: data_source, table_name, record_key, data_hash, data, updated_at
         RowTypeInfo rowTypeInfo = new RowTypeInfo(
                 TypeInformation.of(String.class),    // data_source
-                TypeInformation.of(String.class),    // table_name
+                TypeInformation.of(String.class),    // table_name (только имя таблицы)
+                TypeInformation.of(String.class),    // schema_name (новая колонка)
                 TypeInformation.of(String.class),    // record_key
                 TypeInformation.of(String.class),    // data_hash
                 TypeInformation.of(String.class),    // data (json)
-                TypeInformation.of(Timestamp.class)  // updated_at
+                TypeInformation.of(Timestamp.class), // updated_at
+                TypeInformation.of(String.class),    // db_type
+                TypeInformation.of(String.class)     // db_name
         );
 
+
         if (!sourceDbCForReplication.isEmpty()) {
-            run(rowTypeInfo, tablesToReplicate, sourceDbCForReplication);
+            run(rowTypeInfo, sourceDbCForReplication);
 
             log.info("Репликация завершена успешно для источников : {}",
                     sourceDbCForReplication.stream()
@@ -131,10 +135,10 @@ public class ReplicationServiceImpl implements ReplicationService {
         }
     }
 
-    public void run(RowTypeInfo rowTypeInfo, List<String> tablesToReplicate, List<SourceDbConnections> activeSources) {
+    public void run(RowTypeInfo rowTypeInfo, List<SourceDbConnections> activeSources) {
 
         var rowsDS = env.fromCollection(activeSources)
-                .flatMap(new MetadataExtractorByDatabase(tablesToReplicate, flinkProperty.getMaxRetries(), flinkProperty.getRetryDelayMs()))
+                .flatMap(new MetadataExtractorByDatabase(flinkProperty.getMaxRetries(), flinkProperty.getRetryDelayMs()))
                 .returns(rowTypeInfo);
 
         rowsDS.output(
@@ -145,52 +149,29 @@ public class ReplicationServiceImpl implements ReplicationService {
                         .setPassword(dataSourceProperties.getPassword())
                         .setQuery(
                                 "INSERT INTO metadata " +
-                                        "(data_source, table_name, record_key, data_hash, data, updated_at) " +
-                                        "VALUES (?, ?, ?, ?, ?::jsonb, ?) " +
-                                        "ON CONFLICT (data_source, table_name, record_key) DO UPDATE SET " +
+                                        "    (data_source, table_name, schema_name, record_key, data_hash, data, updated_at, db_type, db_name) " +
+                                        "VALUES (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?) " +
+                                        "ON CONFLICT (data_source, table_name, schema_name, record_key) DO UPDATE SET " +
                                         "    data_hash  = EXCLUDED.data_hash, " +
                                         "    data       = EXCLUDED.data, " +
-                                        "    updated_at = EXCLUDED.updated_at " +
+                                        "    updated_at = EXCLUDED.updated_at, " +
+                                        "    db_type    = EXCLUDED.db_type, " +
+                                        "    db_name    = EXCLUDED.db_name " +
                                         "WHERE metadata.data_hash IS DISTINCT FROM EXCLUDED.data_hash"
                         )
                         .setSqlTypes(new int[]{
                                 Types.VARCHAR,   // data_source
                                 Types.VARCHAR,   // table_name
+                                Types.VARCHAR,   // schema_name (новая колонка)
                                 Types.VARCHAR,   // record_key
                                 Types.VARCHAR,   // data_hash
-                                Types.OTHER,   // data (JSONB)
-                                Types.TIMESTAMP  // updated_at
+                                Types.VARCHAR,   // data (JSONB)
+                                Types.TIMESTAMP, // updated_at
+                                Types.VARCHAR,   // db_type
+                                Types.VARCHAR    // db_name
                         })
                         .finish()
         );
-
-//        rowsDS.output(
-//                JDBCOutputFormat.buildJDBCOutputFormat()
-//                        .setDrivername("org.postgresql.Driver")
-//                        .setDBUrl(dataSourceProperties.getUrl())
-//                        .setUsername(dataSourceProperties.getUsername())
-//                        .setPassword(dataSourceProperties.getPassword())
-//                        .setQuery(
-//                                "INSERT INTO public.metadata (data_source, table_name, record_key, data_hash, data, updated_at) " +
-//                                        "VALUES (?, ?, ?, ?, ?::jsonb, ?) " +
-//                                        "ON CONFLICT (data_source, table_name, record_key) " +
-//                                        "DO UPDATE SET " +
-//                                        "    data_hash   = EXCLUDED.data_hash, " +
-//                                        "    data        = EXCLUDED.data, " +
-//                                        "    updated_at  = EXCLUDED.updated_at " +
-//                                        "WHERE metadata.data_hash IS DISTINCT FROM EXCLUDED.data_hash"
-//                        )
-//                        .setSqlTypes(new int[]{
-//                                Types.VARCHAR,   // data_source
-//                                Types.VARCHAR,   // table_name
-//                                Types.VARCHAR,   // record_key
-//                                Types.VARCHAR,   // data_hash
-//                                Types.OTHER,   // data (JSONB)
-//                                Types.TIMESTAMP  // updated_at
-//                        })
-//                        .finish()
-//        );
-
 
         try {
             env.execute("Репликация метаданных в единую таблицу метаданных");

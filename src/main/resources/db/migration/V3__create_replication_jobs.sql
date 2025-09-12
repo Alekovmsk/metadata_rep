@@ -1,5 +1,5 @@
 
-CREATE TABLE replication_jobs (
+CREATE TABLE postgres_metadata.replication_jobs (
                                   id BIGSERIAL PRIMARY KEY,
                                   db_name TEXT NOT NULL,
                                   status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING, RUNNING, DONE, FAILED
