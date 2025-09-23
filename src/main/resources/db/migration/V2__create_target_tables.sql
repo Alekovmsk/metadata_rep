@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS postgres_metadata.database_metadata (
     parent_fqn  varchar(200) NOT NULL,
     hash_data   varchar(500) NULL,
     created_at  timestamp NULL,
-    CONSTRAINT database_metadata_pk PRIMARY KEY (id, service_name)
+    CONSTRAINT database_metadata_pk PRIMARY KEY (id, parent_fqn)
 );
 CREATE INDEX database_metadata_service_name_idx ON postgres_metadata.database_metadata USING btree (service_name);
 
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS postgres_metadata.schema_metadata (
     parent_fqn  varchar(300) NOT NULL,
     hash_data   varchar(500) NULL,
     created_at  timestamp NULL,
-	CONSTRAINT schema_metadata_pk PRIMARY KEY (id, service_name)
+	CONSTRAINT schema_metadata_pk PRIMARY KEY (id, parent_fqn)
 );
 CREATE INDEX schema_metadata_service_name_idx ON postgres_metadata.schema_metadata USING btree (service_name);
 
@@ -36,6 +36,6 @@ CREATE TABLE postgres_metadata.table_metadata (
     data        jsonb NULL,                     -- теперь содержит только список колонок
     hash_data   varchar(500) NULL,
     created_at  timestamp NULL,
-	CONSTRAINT table_metadata_pk PRIMARY KEY (id, service_name)
+	CONSTRAINT table_metadata_pk PRIMARY KEY (id, parent_fqn)
 );
 CREATE INDEX table_metadata_service_name_idx ON postgres_metadata.table_metadata USING btree (service_name);

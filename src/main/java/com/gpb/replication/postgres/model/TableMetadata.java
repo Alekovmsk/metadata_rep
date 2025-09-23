@@ -39,8 +39,8 @@ public class TableMetadata {
     @Column(name = "name")
     private String name;
 
-    @Column(name = "parent_fqn")
-    private String parentFqn;
+    @Column(name = "service_name")
+    private String serviceName;
 
     @Column(columnDefinition = "jsonb", nullable = false)
     @JdbcTypeCode(SqlTypes.JSON)

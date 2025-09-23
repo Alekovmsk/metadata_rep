@@ -30,7 +30,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -70,7 +69,6 @@ public class ReplicationServiceImpl implements ReplicationService {
 
             // Репликация баз данных
             List<String> databases = databaseReplication(source);
-
             
             for ( String dbName : databases ) {
                 // Репликация схем
@@ -121,7 +119,7 @@ public class ReplicationServiceImpl implements ReplicationService {
 
                 entity.setId(id);
                 entity.setFqn(fqn);
-                entity.setParentFqn(source.getServiceName());
+                entity.setServiceName(source.getServiceName());
                 entity.setName(rs.getString("datname"));
                 entity.setCreatedAt(currentTime);
                 String hashString = fqn;
@@ -149,6 +147,7 @@ public class ReplicationServiceImpl implements ReplicationService {
         """;
         List<SchemaMetadata> entities = new ArrayList<>();
         String url = buildDbUrl(source.getUrl(), dbName);
+        log.info("URL of database: {}", url);
         LocalDateTime currentTime = LocalDateTime.now();
 
         try (Connection conn = DriverManager.getConnection(url, source.getUsername(), source.getPassword());
@@ -160,13 +159,13 @@ public class ReplicationServiceImpl implements ReplicationService {
                 String fqn = getFqn(List.of(source.getServiceName(), dbName, rs.getString("schema_name")));
                 String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
                 
-                EntityId id = new EntityId(rs.getLong("oid"),source.getServiceName());
+                EntityId id = new EntityId(rs.getLong("oid"),parentFqn);
 
                 entity.setId(id);
                 entity.setFqn(fqn);
                 entity.setDbName(dbName);
                 entity.setName(rs.getString("schema_name"));
-                entity.setParentFqn(parentFqn);
+                entity.setServiceName(source.getServiceName());
                 entity.setCreatedAt(currentTime);
 
                 // Подсчет хэш
@@ -201,7 +200,7 @@ public class ReplicationServiceImpl implements ReplicationService {
                         jsonb_build_object(
                             'fqn', current_database() || '.' || n.nspname || '.' || c.relname || '.' || a.attname,
                             'name', a.attname,
-                            'dtype', split_part(format_type(a.atttypid, a.atttypmod), '(', 1),
+                            'dtype', upper(split_part(format_type(a.atttypid, a.atttypmod), '(', 1)),
                             'dataLength', 
                                 CASE 
                                     WHEN a.atttypid IN (1042, 1043, 25) THEN 
@@ -245,7 +244,7 @@ public class ReplicationServiceImpl implements ReplicationService {
                     String fqn = getFqn(List.of(source.getServiceName(), dbName, rs.getString("schema_name"), rs.getString("table_name")));
                     String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
 
-                    EntityId id = new EntityId(rs.getLong("oid"),source.getServiceName());
+                    EntityId id = new EntityId(rs.getLong("oid"),parentFqn);
 
                     entity.setId(id);
                     entity.setFqn(fqn);
@@ -253,23 +252,23 @@ public class ReplicationServiceImpl implements ReplicationService {
                     entity.setSchemaName(rs.getString("schema_name"));
                     entity.setDescription(rs.getString("description"));
                     entity.setName(rs.getString("table_name"));
-                    entity.setParentFqn(parentFqn);
+                    entity.setServiceName(source.getServiceName());
                     entity.setCreatedAt(currentTime);
 
                     // Собираем data (jsonb)
-                    Map<String, Object> dataMap = new HashMap<>();
+                    // Map<String, Object> dataMap = new HashMap<>();
 
                     String jsonString = rs.getString("table_structure");
                     JsonNode columnsNode = objectMapper.readTree(jsonString);
-                    dataMap.put("columns", columnsNode);
+                    // dataMap.put("columns", columnsNode);
 
                     // Подсчет хэш
-                    String jsonStringForHash = objectMapper.writeValueAsString(dataMap);
+                    // String jsonStringForHash = objectMapper.writeValueAsString(dataMap);
                     String hashString = fqn + rs.getString("description");
-                    String hashData = DigestUtils.md5Hex(jsonStringForHash + hashString);
+                    String hashData = DigestUtils.md5Hex(jsonString + hashString);
                     entity.setHashData(hashData);
 
-                    JsonNode jsonNode = objectMapper.valueToTree(dataMap);
+                    JsonNode jsonNode = objectMapper.valueToTree(columnsNode);
                     entity.setData(jsonNode);
 
                     entities.add(entity);
