@@ -200,7 +200,7 @@ public class ReplicationServiceImpl implements ReplicationService {
                         jsonb_build_object(
                             'fqn', current_database() || '.' || n.nspname || '.' || c.relname || '.' || a.attname,
                             'name', a.attname,
-                            'dtype', upper(split_part(format_type(a.atttypid, a.atttypmod), '(', 1)),
+                            'dataType', replace(upper(split_part(format_type(a.atttypid, a.atttypmod), '(', 1)), ' ', '_'),
                             'dataLength', 
                                 CASE 
                                     WHEN a.atttypid IN (1042, 1043, 25) THEN 
@@ -224,7 +224,8 @@ public class ReplicationServiceImpl implements ReplicationService {
                 ) as table_structure
             FROM pg_class c
             JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('r', 'v', 'm')
+            WHERE c.relkind IN ('r', 'v', 'm', 'p')
+            AND c.relispartition = false
             AND n.nspname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
             ORDER BY n.nspname, c.relname;
             """;
