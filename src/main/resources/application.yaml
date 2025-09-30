@@ -13,6 +13,7 @@ spring:
     username: postgres
     password: kampus
     driverClassName: org.postgresql.Driver
+    defaultSchema: postgres_metadata
     hikari:
       maximum-pool-size: 20
       connection-timeout: 30000
@@ -73,7 +74,7 @@ management:
 replication:
   enabled: true
   max-retries: 5
-
+  depthStorage: 10 # Глубина хранения архива метаданных в днях
   postgres:
     tables:
 #      - pg_stat_statements

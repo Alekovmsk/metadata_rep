@@ -10,6 +10,7 @@ import com.gpb.replication.postgres.model.DatabaseMetadata;
 import com.gpb.replication.postgres.model.EntityId;
 import com.gpb.replication.postgres.model.SchemaMetadata;
 import com.gpb.replication.postgres.model.TableMetadata;
+import com.gpb.replication.postgres.properties.SqlTemplates;
 import com.gpb.replication.postgres.repository.DatabaseMetadataRepository;
 import com.gpb.replication.postgres.repository.SchemaMetadataRepository;
 import com.gpb.replication.postgres.repository.TableMetadataRepository;
@@ -47,6 +48,8 @@ public class ReplicationServiceImpl implements ReplicationService {
     private final DatabaseMetadataRepository databaseRep;
     private final SchemaMetadataRepository schemaRep;
     private final TableMetadataRepository tableRep;
+
+    private final SqlTemplates sql;
 
     @Async
     public void startReplicationAsync(String serviceName) {
@@ -98,15 +101,11 @@ public class ReplicationServiceImpl implements ReplicationService {
     }
 
     private List<String> databaseReplication(SourceDbConnections source) {
-        String sql = """
-            SELECT oid, datname FROM pg_database
-            WHERE datistemplate = false AND datallowconn = true AND datname NOT IN ('postgres');
-        """;
         List<String> response = new ArrayList<>();
         LocalDateTime currentTime = LocalDateTime.now();
 
         try (Connection conn = DriverManager.getConnection(source.getUrl(), source.getUsername(), source.getPassword());
-             PreparedStatement stmt = conn.prepareStatement(sql);
+             PreparedStatement stmt = conn.prepareStatement(sql.getDatabaseSql());
              ResultSet rs = stmt.executeQuery()) {
 
             List<DatabaseMetadata> entities = new ArrayList<>();
@@ -140,18 +139,13 @@ public class ReplicationServiceImpl implements ReplicationService {
     }
 
     private void schemaReplication(SourceDbConnections source, String dbName) {
-        String sql = """
-            SELECT n.oid, n.nspname AS schema_name
-            FROM pg_namespace n
-            WHERE n.nspname not in ('information_schema', 'pg_catalog', 'pg_toast');
-        """;
         List<SchemaMetadata> entities = new ArrayList<>();
         String url = buildDbUrl(source.getUrl(), dbName);
         log.info("URL of database: {}", url);
         LocalDateTime currentTime = LocalDateTime.now();
 
         try (Connection conn = DriverManager.getConnection(url, source.getUsername(), source.getPassword());
-             PreparedStatement stmt = conn.prepareStatement(sql);
+             PreparedStatement stmt = conn.prepareStatement(sql.getSchemaSql());
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
@@ -182,59 +176,11 @@ public class ReplicationServiceImpl implements ReplicationService {
     }
 
     private void tableReplication(SourceDbConnections source, String dbName) {
-        String sql = """
-            SELECT
-                c.oid,
-                n.nspname as schema_name,
-                c.relname as table_name,
-                CASE 
-                    WHEN c.relkind = 'r' THEN 'regular'
-                    WHEN c.relkind = 'v' THEN 'view'
-                    WHEN c.relkind = 'm' THEN 'materialized_view'
-                    ELSE 'other'
-                END as table_type,
-                obj_description(c.oid, 'pg_class') as description,
-                jsonb_build_object(
-                    'columns', 
-                    (SELECT jsonb_agg(
-                        jsonb_build_object(
-                            'fqn', current_database() || '.' || n.nspname || '.' || c.relname || '.' || a.attname,
-                            'name', a.attname,
-                            'dataType', replace(upper(split_part(format_type(a.atttypid, a.atttypmod), '(', 1)), ' ', '_'),
-                            'dataLength', 
-                                CASE 
-                                    WHEN a.atttypid IN (1042, 1043, 25) THEN 
-                                        CASE WHEN a.atttypmod > 0 THEN a.atttypmod - 4 ELSE NULL END
-                                    WHEN a.atttypid IN (1700) THEN 
-                                        CASE WHEN a.atttypmod > 0 THEN (a.atttypmod - 4) >> 16 ELSE NULL END
-                                    WHEN a.atttypid IN (1083, 1114, 1184, 1266) THEN 
-                                        CASE WHEN a.atttypmod > 0 THEN a.atttypmod & 65535 ELSE NULL END
-                                    WHEN a.atttypid IN (1560, 1562) THEN 
-                                        CASE WHEN a.atttypmod > 0 THEN a.atttypmod - 4 ELSE NULL END
-                                    ELSE NULL 
-                                END,
-                            'is_nullable', NOT a.attnotnull,
-                            'description', col_description(a.attrelid, a.attnum)
-                        ) ORDER BY a.attnum
-                    )
-                    FROM pg_attribute a 
-                    WHERE a.attrelid = c.oid 
-                    AND a.attnum > 0 
-                    AND NOT a.attisdropped)
-                ) as table_structure
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            WHERE c.relkind IN ('r', 'v', 'm', 'p')
-            AND c.relispartition = false
-            AND n.nspname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
-            ORDER BY n.nspname, c.relname;
-            """;
-
         String url = buildDbUrl(source.getUrl(), dbName);
         LocalDateTime currentTime = LocalDateTime.now();
 
         try (Connection conn = DriverManager.getConnection(url, source.getUsername(), source.getPassword());
-             PreparedStatement stmt = conn.prepareStatement(sql);
+             PreparedStatement stmt = conn.prepareStatement(sql.getTableSql());
              ResultSet rs = stmt.executeQuery()) {
 
             List<TableMetadata> entities = new ArrayList<>();

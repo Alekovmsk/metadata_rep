@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS postgres_metadata.schema_metadata (
 );
 CREATE INDEX schema_metadata_service_name_idx ON postgres_metadata.schema_metadata USING btree (service_name);
 
-CREATE TABLE postgres_metadata.table_metadata (
+CREATE TABLE IF NOT EXISTS postgres_metadata.table_metadata (
     id        bigint NOT NULL,
     fqn         varchar(400) NOT NULL,
     service_name varchar(100) NOT NULL,
