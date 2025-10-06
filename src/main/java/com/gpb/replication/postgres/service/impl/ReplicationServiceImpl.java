@@ -202,15 +202,8 @@ public class ReplicationServiceImpl implements ReplicationService {
                     entity.setServiceName(source.getServiceName());
                     entity.setCreatedAt(currentTime);
 
-                    // Собираем data (jsonb)
-                    // Map<String, Object> dataMap = new HashMap<>();
-
                     String jsonString = rs.getString("table_structure");
                     JsonNode columnsNode = objectMapper.readTree(jsonString);
-                    // dataMap.put("columns", columnsNode);
-
-                    // Подсчет хэш
-                    // String jsonStringForHash = objectMapper.writeValueAsString(dataMap);
                     String hashString = fqn + rs.getString("description");
                     String hashData = DigestUtils.md5Hex(jsonString + hashString);
                     entity.setHashData(hashData);

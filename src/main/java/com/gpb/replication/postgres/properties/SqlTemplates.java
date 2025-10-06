@@ -1,12 +1,10 @@
 package com.gpb.replication.postgres.properties;
 
-import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import lombok.Getter;
 import lombok.Setter;
 
-@Configuration
 @Getter
 @Setter
 @Component("sqlTemplates")
