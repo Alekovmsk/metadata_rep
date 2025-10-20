@@ -2,16 +2,19 @@
 
 spring:
   application:
-    name: flink-replication-service
-    version: 0.0.1-SNAPSHOT
+    name: postgres-replication-service
+    version: 0.0.1-POSTGRES
     dpt: 912044
     dntdom: GPB
     user: test_user
+    ip: test_ip
+    host: test_dns
+    port: test_port
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata
-    username: postgres
-    password: kampus
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:kampus}
     driverClassName: org.postgresql.Driver
     defaultSchema: postgres_metadata
     hikari:
@@ -43,6 +46,26 @@ spring:
     threads:
       max: 50 # Размер очереди запросов
 
+  config:
+    import: optional:vault://
+
+  cloud:
+    vault:
+      uri: http://vault:8200
+      authentication: APPROLE
+      app-role:
+        role-id: ${VAULT_ROLE_ID}
+        secret-id: ${VAULT_SECRET_ID}
+
+      kv:
+        enabled: true
+        backend: secret_v2_t
+        default-context: ord/src/connections
+        application-name: ""
+
+      connection-timeout: 5000
+      read-timeout: 15000
+
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
@@ -70,42 +93,9 @@ management:
         prometheus:
           enabled: true
 
-
-replication:
-  enabled: true
-  max-retries: 5
-  depthStorage: 10 # Глубина хранения архива метаданных в днях
-  postgres:
-    tables:
-#      - pg_stat_statements
-      - pg_catalog.pg_database
-      - pg_catalog.pg_user
-      - pg_catalog.pg_class
-      - pg_catalog.pg_namespace
-      - pg_catalog.pg_partitioned_table
-      - information_schema.columns
-      - information_schema.tables
-      - pg_catalog.pg_policy
-      - pg_catalog.pg_description
-      - pg_catalog.pg_sequence
-      - pg_catalog.pg_attrdef
-      - pg_catalog.pg_attribute
-      - pg_catalog.pg_type
-      - pg_catalog.pg_index
-      - pg_catalog.pg_constraint
-      - pg_catalog.pg_am
-      - pg_catalog.pg_enum
-
-flink:
-  job:
-    name: pg-replication-job
-    parallelism: 20
-    max-retries: 3
-    retry-delay-ms: 1000
-
 sources:
   connections:
-    file-path: ${CONFIG_DIR:classpath:db-connections.json}
+    file-path: file:${CONFIG_DIR:classpath:db-connections.json}
 
 logging:
   level:
@@ -114,9 +104,9 @@ logging:
     org.hibernate.engine.jdbc.connections.internal.DriverManagerConnectionProviderImpl: DEBUG
     org.apache.flink: INFO
     org.springframework.jdbc: WARN
-    com.example.flinkreplication: DEBUG
+    com.gpb.replication.postgres: DEBUG
   file:
-    name: logs/flink-replication.log
+    name: logs/replication.log
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"

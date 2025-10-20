@@ -17,6 +17,7 @@ import com.gpb.replication.postgres.repository.TableMetadataRepository;
 import com.gpb.replication.postgres.service.DbSourcesService;
 import com.gpb.replication.postgres.service.ReplicationService;
 
+import com.gpb.replication.postgres.service.VaultSecretService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,9 +33,6 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -48,7 +46,7 @@ public class ReplicationServiceImpl implements ReplicationService {
     private final DatabaseMetadataRepository databaseRep;
     private final SchemaMetadataRepository schemaRep;
     private final TableMetadataRepository tableRep;
-
+    private final VaultSecretService vault;
     private final SqlTemplates sql;
 
     @Async
@@ -57,26 +55,31 @@ public class ReplicationServiceImpl implements ReplicationService {
     }
 
     public void startReplication(String serviceName) {
-        // Чистим таблицы
+        SourceDbConnections source;
+
+        if (vault.isVaultConnected() && vault.serviceSecretsExist(serviceName)) {
+            source = vault.getServiceSecrets(serviceName);
+        } else {
+            source = dbSourcesService.getDbConnections()
+                    .stream()
+                    .filter(s -> s.getName().equals(serviceName))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Не найден сервис: " + serviceName));
+        }
         truncateTables(serviceName);
 
-        Map<String, SourceDbConnections> dbConnectionsMap = dbSourcesService.getDbConnections()
-                .stream()
-                .collect(Collectors.toMap(
-                        SourceDbConnections::getName,
-                        Function.identity()
-                ));
+        try {
+            svoiCustomLogger.logConnectToSource(
+                    source.getHostFromUrl(),
+                    source.getPortFromUrl(),
+                    source.getDbType(),
+                    source.getUsername()
+            );
 
-        if (dbConnectionsMap.containsKey(serviceName)) {
-            SourceDbConnections source = dbConnectionsMap.get(serviceName);
-
-            // Репликация баз данных
             List<String> databases = databaseReplication(source);
-            
-            for ( String dbName : databases ) {
-                // Репликация схем
+
+            for (String dbName : databases) {
                 schemaReplication(source, dbName);
-                // Репликация таблиц
                 tableReplication(source, dbName);
             }
 
@@ -88,9 +91,20 @@ public class ReplicationServiceImpl implements ReplicationService {
                             serviceName),
                     SvoiSeverityEnum.ONE
             );
+            log.info("Всего реплицировано {} баз данных из источника {}", databases.size(), serviceName);
 
-        } else {
-            log.info("Не найденно данных по сервису {} для репликации", serviceName);
+        } catch (SQLException e) {
+            svoiCustomLogger.logAuthError(
+                    source.getHostFromUrl(),
+                    source.getDnsFromUrl(),
+                    source.getPortFromUrl(),
+                    source.getDbType(),
+                    source.getUsername(),
+                    e
+            );
+
+            log.error("Ошибка при подключении к источнику {}", source.getName(), e);
+            throw new RuntimeException("Ошибка при подключении к источнику: " + source.getName(), e);
         }
     }
 
@@ -100,8 +114,8 @@ public class ReplicationServiceImpl implements ReplicationService {
         tableRep.deleteByServiceName(serviceName);
     }
 
-    private List<String> databaseReplication(SourceDbConnections source) {
-        List<String> response = new ArrayList<>();
+    private List<String> databaseReplication(SourceDbConnections source) throws SQLException {
+        List<String> databases = new ArrayList<>();
         LocalDateTime currentTime = LocalDateTime.now();
 
         try (Connection conn = DriverManager.getConnection(source.getUrl(), source.getUsername(), source.getPassword());
@@ -111,35 +125,34 @@ public class ReplicationServiceImpl implements ReplicationService {
             List<DatabaseMetadata> entities = new ArrayList<>();
 
             while (rs.next()) {
-                DatabaseMetadata entity = new DatabaseMetadata();
-                String fqn = getFqn(List.of(source.getServiceName(), rs.getString("datname")));
+                String dbName = rs.getString("datname");
+                long oid = rs.getLong("oid");
+                String fqn = getFqn(List.of(source.getServiceName(), dbName));
 
-                EntityId id = new EntityId(rs.getLong("oid"),source.getServiceName());
+                DatabaseMetadata db = new DatabaseMetadata();
+                db.setId(new EntityId(oid, source.getServiceName()));
+                db.setFqn(fqn);
+                db.setServiceName(source.getServiceName());
+                db.setName(dbName);
+                db.setCreatedAt(currentTime);
+                db.setHashData(DigestUtils.md5Hex(fqn));
 
-                entity.setId(id);
-                entity.setFqn(fqn);
-                entity.setServiceName(source.getServiceName());
-                entity.setName(rs.getString("datname"));
-                entity.setCreatedAt(currentTime);
-                String hashString = fqn;
 
-                // Подсчет хэш
-                String hashData = DigestUtils.md5Hex(hashString);
-                entity.setHashData(hashData);
-
-                entities.add(entity);
-                response.add(rs.getString("datname"));
+                entities.add(db);
+                databases.add(dbName);
             }
             databaseRep.saveAll(entities);
+            log.info("Реплицировано {} DB Postgres для {}", databases.size(), source.getServiceName());
 
         } catch (SQLException e) {
-            log.error("Ошибка при получении списка баз для {}: {}", source.getName(), e.getMessage(), e);
+            log.error("Ошибка при подключении и получении DB из Postgres для {}: {}", source.getName(), e.getMessage(), e);
+            throw e;
         }
-        return response;
+        return databases;
     }
 
-    private void schemaReplication(SourceDbConnections source, String dbName) {
-        List<SchemaMetadata> entities = new ArrayList<>();
+    private void schemaReplication(SourceDbConnections source, String dbName) throws SQLException {
+        List<SchemaMetadata> schemas = new ArrayList<>();
         String url = buildDbUrl(source.getUrl(), dbName);
         log.info("URL of database: {}", url);
         LocalDateTime currentTime = LocalDateTime.now();
@@ -149,33 +162,32 @@ public class ReplicationServiceImpl implements ReplicationService {
              ResultSet rs = stmt.executeQuery()) {
 
             while (rs.next()) {
-                SchemaMetadata entity = new SchemaMetadata();
-                String fqn = getFqn(List.of(source.getServiceName(), dbName, rs.getString("schema_name")));
+                String schemaName = rs.getString("schema_name");
+                long oid = rs.getLong("oid");
+                String fqn = getFqn(List.of(source.getServiceName(), dbName, schemaName));
                 String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
-                
-                EntityId id = new EntityId(rs.getLong("oid"),parentFqn);
 
-                entity.setId(id);
-                entity.setFqn(fqn);
-                entity.setDbName(dbName);
-                entity.setName(rs.getString("schema_name"));
-                entity.setServiceName(source.getServiceName());
-                entity.setCreatedAt(currentTime);
 
-                // Подсчет хэш
-                String hashString = fqn;
-                String hashData = DigestUtils.md5Hex(hashString);
-                entity.setHashData(hashData);
+                SchemaMetadata schema = new SchemaMetadata();
+                schema.setId(new EntityId(oid, parentFqn));
+                schema.setFqn(fqn);
+                schema.setDbName(dbName);
+                schema.setName(rs.getString("schema_name"));
+                schema.setServiceName(source.getServiceName());
+                schema.setCreatedAt(currentTime);
+                schema.setHashData(DigestUtils.md5Hex(fqn));
 
-                entities.add(entity);
+                schemas.add(schema);
             }
-            schemaRep.saveAll(entities);
+            schemaRep.saveAll(schemas);
+            log.info("Реплицировано {} схем Postgres для DB {}", schemas.size(), dbName);
         } catch (SQLException e) {
-            log.error("Ошибка при получении схем для {}: {}", source.getName(), e.getMessage(), e);
+            log.error("Ошибка при подключении и получении схем Postgres для {}: {}", dbName, e.getMessage(), e);
+            throw e;
         }
     }
 
-    private void tableReplication(SourceDbConnections source, String dbName) {
+    private void tableReplication(SourceDbConnections source, String dbName) throws SQLException {
         String url = buildDbUrl(source.getUrl(), dbName);
         LocalDateTime currentTime = LocalDateTime.now();
 
@@ -187,33 +199,32 @@ public class ReplicationServiceImpl implements ReplicationService {
 
             while (rs.next()) {
                 try {
-                    TableMetadata entity = new TableMetadata();
+                    TableMetadata table = new TableMetadata();
                     String fqn = getFqn(List.of(source.getServiceName(), dbName, rs.getString("schema_name"), rs.getString("table_name")));
                     String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
 
-                    EntityId id = new EntityId(rs.getLong("oid"),parentFqn);
+                    EntityId id = new EntityId(rs.getLong("oid"), parentFqn);
 
-                    entity.setId(id);
-                    entity.setFqn(fqn);
-                    entity.setDbName(dbName);
-                    entity.setSchemaName(rs.getString("schema_name"));
-                    entity.setDescription(rs.getString("description"));
-                    entity.setName(rs.getString("table_name"));
-                    entity.setServiceName(source.getServiceName());
-                    entity.setCreatedAt(currentTime);
+                    table.setId(id);
+                    table.setFqn(fqn);
+                    table.setDbName(dbName);
+                    table.setSchemaName(rs.getString("schema_name"));
+                    table.setDescription(rs.getString("description"));
+                    table.setName(rs.getString("table_name"));
+                    table.setServiceName(source.getServiceName());
+                    table.setCreatedAt(currentTime);
 
                     String jsonString = rs.getString("table_structure");
-                    JsonNode columnsNode = objectMapper.readTree(jsonString);
                     String hashString = fqn + rs.getString("description");
-                    String hashData = DigestUtils.md5Hex(jsonString + hashString);
-                    entity.setHashData(hashData);
+                    table.setHashData(DigestUtils.md5Hex(jsonString + hashString));
 
+                    JsonNode columnsNode = objectMapper.readTree(jsonString);
                     JsonNode jsonNode = objectMapper.valueToTree(columnsNode);
-                    entity.setData(jsonNode);
+                    table.setData(jsonNode);
 
-                    entities.add(entity);
+                    entities.add(table);
                 } catch (JsonProcessingException e) {
-                    log.error("Ошибка при преобразовании JSON для таблицы {}: {}", 
+                    log.error("Ошибка при преобразовании JSON для таблицы {}: {}",
                             rs.getString("table_name"), e.getMessage(), e);
                 }
             }
@@ -221,6 +232,7 @@ public class ReplicationServiceImpl implements ReplicationService {
 
         } catch (SQLException e) {
             log.error("Ошибка при получении таблиц для {}: {}", source.getName(), e.getMessage(), e);
+            throw e;
         }
     }
 
