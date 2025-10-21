@@ -9,14 +9,18 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
+
 @Configuration
 public class SwaggerConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .components(new Components().addSecuritySchemes("bearerAuth",
-                        new SecurityScheme().type(SecurityScheme.Type.HTTP).scheme("bearer").bearerFormat("JWT")))
-                .security(List.of(new SecurityRequirement().addList("bearerAuth")));
+                .components(new Components()
+                        .addSecuritySchemes("basicAuth",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("basic")))
+                .security(List.of(new SecurityRequirement().addList("basicAuth")));
     }
 }

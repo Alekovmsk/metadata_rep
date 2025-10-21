@@ -66,6 +66,7 @@ public class ReplicationServiceImpl implements ReplicationService {
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Не найден сервис: " + serviceName));
         }
+
         truncateTables(serviceName);
 
         try {

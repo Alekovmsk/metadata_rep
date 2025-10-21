@@ -1,4 +1,4 @@
-package com.gpb.replication.postgres.config;
+package com.gpb.replication.postgres.controllers;
 
 import com.gpb.replication.postgres.log.SvoiCustomLogger;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,7 +25,6 @@ public class ReplicationController {
 
     @PostMapping("/start")
     @Operation(summary = "Запуск репликации по наименованию сервиса")
-
     public ResponseEntity<String> startReplication(@RequestBody ReplicationRequestDto dto, HttpServletRequest httpServletRequest) {
         try {
             logger.logApiCall(httpServletRequest, "startReplicationPostgres", dto);
