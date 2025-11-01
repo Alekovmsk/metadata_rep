@@ -77,10 +77,11 @@ spring:
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/log_db
+  url: jdbc:postgresql://localhost:5432/db_log
   username: postgres
   password: kampus
   driverClassName: org.postgresql.Driver
+  table: "audit.jdata_postgres_log"
 
 clean-database-logs:
   # cron expression, to switch off put value '-'
