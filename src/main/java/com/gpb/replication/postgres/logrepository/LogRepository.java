@@ -1,18 +1,18 @@
 package com.gpb.replication.postgres.logrepository;
 
+import com.gpb.replication.postgres.service.CefLogFileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-
-import java.sql.Date;
+import java.sql.Timestamp;
 
 
 @Repository
 @RequiredArgsConstructor
-public class LogRepository{
+public class LogRepository {
 
     private final JdbcTemplate logsJdbcTemplate;
-
+    private final CefLogFileService cefLogFileService;
     public Log findLatestByType(String type, String host) {
         String sql = """
             SELECT l.id, l.type, l.log, l.created
@@ -29,7 +29,7 @@ public class LogRepository{
                 log.setId(rs.getObject("id", Integer.class));
                 log.setType(rs.getString("type"));
                 log.setLog(rs.getString("log"));
-                log.setCreated(new Date(rs.getTimestamp("created").getTime()));
+                log.setCreated(rs.getTimestamp("created").toLocalDateTime());
                 return log;
             }
             return null;
@@ -43,8 +43,11 @@ public class LogRepository{
         """;
 
         logsJdbcTemplate.update(sql,
-                new java.sql.Timestamp(log.getCreated().getTime()),
+                Timestamp.valueOf(log.getCreated()),
                 log.getLog(),
                 log.getType());
+
+        cefLogFileService.writeToFile(log.getCreated(), log.getLog());
+        cefLogFileService.cleanupOldLogs();
     }
 }

@@ -13,16 +13,16 @@ import org.springframework.boot.context.event.ApplicationStartedEvent;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @Setter
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor
 public class SvoiJournalFactory {
-    private final SimpleDateFormat DATE_FORMAT_PATTERN = new SimpleDateFormat("MMM dd yyyy HH:mm:ss");
-    private String deviceProduct;
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");    private String deviceProduct;
     private String deviceVersion;
     @Value("$server.port")
     private Integer localPort;
@@ -35,20 +35,20 @@ public class SvoiJournalFactory {
     public SvoiJournal getJournalSource() {
         SvoiJournal svoiJournal = this.getBaseJournal();
         svoiJournal.setDvchost(this.getLocalHostName());
-        svoiJournal.setStart(new Date());
+        svoiJournal.setStart(LocalDateTime.now());
         return svoiJournal;
     }
 
     public SvoiJournal getJournalTarget() {
         SvoiJournal svoiJournal = this.getBaseJournal();
         svoiJournal.setDvchost(this.getLocalHostName());
-        svoiJournal.setEnd(new Date());
+        svoiJournal.setEnd(LocalDateTime.now());
         return svoiJournal;
     }
 
     private SvoiJournal getBaseJournal() {
-        Date now = new Date();
-        SvoiJournal svoiJournal = new SvoiJournal(this.nextLineNumber(), this.DATE_FORMAT_PATTERN);
+        LocalDateTime now = LocalDateTime.now();
+        SvoiJournal svoiJournal = new SvoiJournal(this.nextLineNumber(), DATE_FORMATTER);
         svoiJournal.setDeviceProduct(this.buildProperties != null ? this.buildProperties.getName() : this.deviceProduct);
         svoiJournal.setDeviceVersion(this.buildProperties != null ? this.buildProperties.getVersion() : this.deviceVersion);
         svoiJournal.setTime(now);

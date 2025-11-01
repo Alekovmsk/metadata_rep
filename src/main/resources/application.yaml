@@ -1,5 +1,15 @@
-# application.yml
-
+# server:
+#   port: 9200
+#   ssl:
+#     key-store: file:/app/cert/certificate.pfx
+#     key-store-password: ${KEYSTORE_PASSWORD}
+#     key-store-type: PKCS12
+#     enabled-protocols: TLSv1.3,TLSv1.2
+#     ciphers: >-
+#       TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+#       TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
+#       TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
+#       TLS_DHE_RSA_WITH_AES_256_CBC_SHA256
 spring:
   application:
     name: postgres-replication-service
@@ -98,6 +108,9 @@ sources:
     file-path: file:${CONFIG_DIR:classpath:db-connections.json}
 
 logging:
+  cef:
+    path: logs/cef
+    retention-days: 30
   level:
     root: INFO
     org.hibernate.SQL: DEBUG
@@ -106,7 +119,7 @@ logging:
     org.springframework.jdbc: WARN
     com.gpb.replication.postgres: DEBUG
   file:
-    name: logs/replication.log
+    name: logs/jdata.log
   pattern:
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     console: "%d{HH:mm:ss} %-5level %logger{36} - %msg%n"
