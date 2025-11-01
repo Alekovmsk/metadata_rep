@@ -2,6 +2,8 @@ package com.gpb.replication.postgres.service;
 
 import com.gpb.replication.postgres.properties.CefLoggingProperties;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,6 +15,8 @@ import java.time.format.DateTimeFormatter;
 @RequiredArgsConstructor
 public class CefLogFileService {
 
+    private static final Logger log = LoggerFactory.getLogger(CefLogFileService.class);
+
     private final CefLoggingProperties properties;
 
     private static final DateTimeFormatter FILE_TS =
@@ -23,7 +27,7 @@ public class CefLogFileService {
 
     public Path getDailyLogPath() {
         String date = LocalDate.now(ZONE).format(FILE_DATE);
-        return Paths.get(properties.getPath() + "-" + date + ".log");
+        return Paths.get(properties.getPath() + ".jdata.log." + date);
     }
 
     public void writeToFile(LocalDateTime created, String cefLog) {
@@ -33,30 +37,32 @@ public class CefLogFileService {
             String line = created.format(FILE_TS) + " " + cefLog + System.lineSeparator();
             Files.writeString(path, line, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            System.err.println("Ошибка при записи CEF-лога: " + e.getMessage());
+            log.error("Ошибка при записи CEF-лога в файл {}", path, e);
         }
     }
+
     public void cleanupOldLogs() {
         Path dir = Paths.get(properties.getPath()).getParent();
         if (dir == null || !Files.exists(dir)) return;
 
         LocalDate threshold = LocalDate.now(ZONE).minusDays(properties.getRetentionDays());
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "cef-*.log")) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "cef.jdata.log.*")) {
             for (Path p : stream) {
                 String name = p.getFileName().toString();
-                if (name.length() < 18) continue;
+                if (name.length() < 24) continue;
                 try {
-                    String datePart = name.substring(4, 14);
+                    String datePart = name.substring(14, 24);
                     LocalDate fileDate = LocalDate.parse(datePart, FILE_DATE);
                     if (fileDate.isBefore(threshold)) {
                         Files.deleteIfExists(p);
-                        System.out.println("Удалён старый лог: " + name);
+                        log.info("Удалён старый лог: {}", name);
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    log.warn("Не удалось разобрать дату из имени файла: {}", name);
+                }
             }
         } catch (IOException e) {
-            System.err.println("Ошибка при очистке старых логов: " + e.getMessage());
+            log.error("Ошибка при очистке старых логов", e);
         }
     }
 }
-
