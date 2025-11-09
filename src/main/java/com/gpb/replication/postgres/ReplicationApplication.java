@@ -39,12 +39,9 @@ public class ReplicationApplication {
     private final LogRepository logRepository;
     private final ConfigurableEnvironment configurableEnvironment;
     private static ConfigurableApplicationContext applicationContext;
-    private final CefLogFileService cefLogger;
 
     @PostConstruct
     public void startupApplication() {
-        cefLogger.rotateLogFile();
-        cefLogger.cleanupOldLogs();
         logPartitionRepository.createTodayPartition();
         svoiCustomLogger.send("startService", "Start Service", "Started service", SvoiSeverityEnum.ONE);
 
