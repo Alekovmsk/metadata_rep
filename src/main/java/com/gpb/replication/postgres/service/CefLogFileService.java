@@ -26,8 +26,12 @@ public class CefLogFileService {
     private static final ZoneId ZONE = ZoneId.systemDefault();
 
     public Path getDailyLogPath() {
-        String date = LocalDate.now(ZONE).format(FILE_DATE);
-        return Paths.get(properties.getPath() + ".jdata.log." + date);
+        return Paths.get(properties.getPath() + ".log");
+    }
+
+    public Path getArchLogPath() {
+        String date = LocalDate.now(ZONE).minusDays(1).format(FILE_DATE);
+        return Paths.get(properties.getPath() + ".log." + date);
     }
 
     public void writeToFile(LocalDateTime created, String cefLog) {
@@ -46,12 +50,12 @@ public class CefLogFileService {
         if (dir == null || !Files.exists(dir)) return;
 
         LocalDate threshold = LocalDate.now(ZONE).minusDays(properties.getRetentionDays());
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "cef.jdata.log.*")) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "cef.log.*")) {
             for (Path p : stream) {
                 String name = p.getFileName().toString();
-                if (name.length() < 24) continue;
+                if (name.length() < 18) continue;
                 try {
-                    String datePart = name.substring(14, 24);
+                    String datePart = name.substring(8, 18);
                     LocalDate fileDate = LocalDate.parse(datePart, FILE_DATE);
                     if (fileDate.isBefore(threshold)) {
                         Files.deleteIfExists(p);
@@ -63,6 +67,17 @@ public class CefLogFileService {
             }
         } catch (IOException e) {
             log.error("Ошибка при очистке старых логов", e);
+        }
+    }
+
+    public void rotateLogFile() {
+        Path currentFileName = getDailyLogPath();
+        Path archFileName = getArchLogPath();
+        if (currentFileName == null || !Files.exists(currentFileName)) return;
+        try {
+            Files.move(currentFileName, archFileName);
+        } catch (IOException e) {
+            log.error("Ошибка при архивировании лог-файла: ", e);
         }
     }
 }

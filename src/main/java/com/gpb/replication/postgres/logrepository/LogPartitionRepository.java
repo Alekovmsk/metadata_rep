@@ -1,7 +1,7 @@
 package com.gpb.replication.postgres.logrepository;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -13,12 +13,21 @@ import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Repository
-@RequiredArgsConstructor
 public class LogPartitionRepository {
 
     private final JdbcTemplate logsJdbcTemplate;
     private final CleanDatabaseLogsProperties cleanDatabaseLogs;
     private final LogsDatabaseProperties logsDatabaseProperties;
+
+    public LogPartitionRepository(
+            @Qualifier("logsJdbcTemplate") JdbcTemplate logsJdbcTemplate,
+            CleanDatabaseLogsProperties cleanDatabaseLogs,
+            LogsDatabaseProperties logsDatabaseProperties
+    ) {
+        this.logsJdbcTemplate = logsJdbcTemplate;
+        this.cleanDatabaseLogs = cleanDatabaseLogs;
+        this.logsDatabaseProperties = logsDatabaseProperties;
+    }
 
     public void createTodayPartition() {
         if (!logsDatabaseProperties.isEnabled()) {
@@ -32,10 +41,10 @@ public class LogPartitionRepository {
                 currentDate.format(DateTimeFormatter.ofPattern("yyyy_MM_dd")));
 
         String sql = String.format("""
-            CREATE TABLE IF NOT EXISTS %s
-            PARTITION OF %s
-            FOR VALUES FROM ('%s 00:00:00') TO ('%s 00:00:00')
-            """,
+                        CREATE TABLE IF NOT EXISTS %s
+                        PARTITION OF %s
+                        FOR VALUES FROM ('%s 00:00:00') TO ('%s 00:00:00')
+                        """,
                 partitionName,
                 table,
                 currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),

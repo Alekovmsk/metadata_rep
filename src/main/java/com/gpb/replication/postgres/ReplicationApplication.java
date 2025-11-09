@@ -1,5 +1,6 @@
 package com.gpb.replication.postgres;
 
+import com.gpb.replication.postgres.service.CefLogFileService;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.commons.lang3.StringUtils;
@@ -38,9 +39,12 @@ public class ReplicationApplication {
     private final LogRepository logRepository;
     private final ConfigurableEnvironment configurableEnvironment;
     private static ConfigurableApplicationContext applicationContext;
+    private final CefLogFileService cefLogger;
 
     @PostConstruct
     public void startupApplication() {
+        cefLogger.rotateLogFile();
+        cefLogger.cleanupOldLogs();
         logPartitionRepository.createTodayPartition();
         svoiCustomLogger.send("startService", "Start Service", "Started service", SvoiSeverityEnum.ONE);
 
@@ -74,7 +78,7 @@ public class ReplicationApplication {
     }
 
     public static void main(String[] args) {
-         SpringApplication.run(ReplicationApplication.class, args);
+        SpringApplication.run(ReplicationApplication.class, args);
     }
 
     @PreDestroy
