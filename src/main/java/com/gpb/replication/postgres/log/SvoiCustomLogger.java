@@ -15,8 +15,6 @@ import com.gpb.replication.postgres.properties.SysProperties;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -24,12 +22,14 @@ import java.util.*;
 @Component
 @Slf4j
 public class SvoiCustomLogger {
+
     private final SysProperties sysProperties;
     private final LogsDatabaseProperties logsDatabaseProperties;
     private final LogRepository logRepository;
-    private final SvoiJournalFactory svoiJournalFactory = new SvoiJournalFactory();
-    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
+    private final SvoiJournalFactory journalFactory = new SvoiJournalFactory();
 
+    private static final DateTimeFormatter FORMATTER =
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
 
     @Autowired
     public SvoiCustomLogger(SysProperties sysProperties,
@@ -39,130 +39,180 @@ public class SvoiCustomLogger {
         this.logsDatabaseProperties = logsDatabaseProperties;
         this.logRepository = logRepository;
     }
+
     public void logConnectToSource(String sourceHost,
                                    int sourcePort,
                                    String dbType,
                                    String duser) {
+
         try {
-            SvoiJournal journal = svoiJournalFactory.getJournalSource();
-            String Dhost;
-            String Dst;
-            if (isIpAddress(sourceHost)) {
-                Dst = sourceHost;
-                Dhost = resolveToOpposite(sourceHost);
+            SvoiJournal journal = prepareJournalBase();
+            String dst;
+            String dhost;
+            if (isIp(sourceHost)) {
+                dst = sourceHost;
+                dhost = resolveHost(sourceHost);
             } else {
-                Dst = resolveToOpposite(sourceHost);
-                Dhost = sourceHost;
+                dst = resolveHost(sourceHost);
+                dhost = sourceHost;
             }
-            journal.setDhost(Dhost);
-            journal.setDst(Dst);
-            journal.setDvchost(Dhost);
+
+            journal.setDhost(dhost);
+            journal.setDst(dst);
+            journal.setDvchost(dhost);
             journal.setDpt(sourcePort);
             journal.setDuser(duser);
 
             String message = String.format("connectTo%s dns=%s ip=%s port=%d",
-                    dbType, Dhost, Dst, sourcePort);
+                    dbType, dhost, dst, sourcePort);
 
-            sendInternal("connectToSource",
-                    "Database Connection",
-                    message,
-                    SvoiSeverityEnum.ONE,
-                    journal);
+            send("connectToSource", "Database Connection", message,
+                    SvoiSeverityEnum.ONE, journal);
 
         } catch (Exception e) {
             log.error("Ошибка при логировании подключения к источнику {}", dbType, e);
         }
     }
 
-    public void logAuthError(String ip, String dns, int port, String dbType, String username, Exception e) {
+    /** Ошибка подключения или авторизации к базе источника */
+    public void logDbConnectionError(String ip, String dns, int port, String dbType, String username, Exception e) {
         try {
-            SvoiJournal journal = svoiJournalFactory.getJournalSource();
-            String localHostName;
-            String localHostAddress;
-            try {
-                localHostName = InetAddress.getLocalHost().getHostName();
-                localHostAddress = InetAddress.getLocalHost().getHostAddress();
-            } catch (UnknownHostException ex) {
-                localHostName = InetAddress.getLoopbackAddress().getHostName();
-                localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
-            }
+            SvoiJournal journal = prepareJournalBase();
 
-            journal.setShost(localHostName);
-            journal.setSrc(localHostAddress);
-            journal.setSpt(0);
+            journal.setSrc(ip);
+            journal.setShost(dns);
+            journal.setDpt(port);
 
             String message = String.format(
-                    "authError connectTo%s user=%s dns=%s ip=%s port=%d error=%s",
+                    "dbConnectionError connectTo%s user=%s dns=%s ip=%s port=%d error=%s",
                     dbType,
                     username,
                     dns,
                     ip,
                     port,
-                    e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()
+                    (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
             );
 
-            sendInternal(
-                    "authError",
-                    "Authorization Error",
+            send("dbConnectionError",
+                    "DB Connection Error",
                     message,
                     SvoiSeverityEnum.FIVE,
-                    journal
-            );
+                    journal);
 
         } catch (Exception ex) {
-            log.error("Ошибка при логировании ошибки авторизации", ex);
+            log.error("Ошибка при логировании dbConnectionError", ex);
         }
     }
-
 
     public void logApiCall(HttpServletRequest request, String message, ReplicationRequestDto dto) {
         try {
-            String clientIp = request.getRemoteAddr();
-            String clientHost = request.getRemoteHost();
-            int clientPort = request.getRemotePort();
-
-            SvoiJournal journal = svoiJournalFactory.getJournalSource();
-            journal.setShost(clientHost);
-            journal.setSrc(clientIp);
-            journal.setSpt(clientPort);
+            SvoiJournal journal = prepareJournalFromRequest(request);
 
             String extendedMessage = message;
             if (dto != null && dto.getServiceName() != null) {
-                extendedMessage = String.format("%s serviceName=%s", message, dto.getServiceName());
+                extendedMessage += " serviceName=" + dto.getServiceName();
             }
 
-            sendInternal(
-                    "metadataSyncApi",
+            send("metadataSyncApi",
                     "Metadata Synchronization Request",
                     extendedMessage,
                     SvoiSeverityEnum.ONE,
-                    journal
-            );
+                    journal);
 
         } catch (Exception e) {
-            String contextInfo = (dto != null && dto.getServiceName() != null)
-                    ? String.format(" Ошибка при логировании вызова API (serverName=%s)", dto.getServiceName())
-                    : " Ошибка при логировании вызова API";
-            log.error(contextInfo, e);
+            log.error("Ошибка при логировании вызова API", e);
         }
     }
 
-    public void send(String deviceEventClassID, String name, String message, SvoiSeverityEnum severity) {
-        sendInternal(deviceEventClassID, name, message, severity, svoiJournalFactory.getJournalSource());
+    public void logBadCredentials(String ip, String username, String endpoint) {
+        try {
+            SvoiJournal journal = prepareJournalBase();
+            journal.setSrc(ip);
+            journal.setShost(ip);
+
+            String message = String.format(
+                    "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
+                    username != null ? username : "unknown",
+                    endpoint,
+                    ip
+            );
+
+            send("authFailed", "Invalid Login or Password", message,
+                    SvoiSeverityEnum.FIVE, journal);
+
+        } catch (Exception ex) {
+            log.error("Ошибка при логировании неверных учётных данных", ex);
+        }
     }
 
-    private void sendInternal(String deviceEventClassID, String name, String message,
-                              SvoiSeverityEnum severity, SvoiJournal journal) {
-        String localHostName;
-        String localHostAddress;
+    public void sendInternal(String deviceEventClassID,
+                             String name,
+                             String message,
+                             SvoiSeverityEnum severity) {
+
+        SvoiJournal journal = prepareJournalBase();
+        send(deviceEventClassID, name, message, severity, journal);
+    }
+
+    private void send(String deviceEventClassID,
+                      String name,
+                      String message,
+                      SvoiSeverityEnum severity,
+                      SvoiJournal journal) {
+
+        fillJournalDefaults(journal, deviceEventClassID, name, message, severity);
+
+        try (MDC.MDCCloseable a = MDC.putCloseable("host", journal.getHostForSvoi());
+             MDC.MDCCloseable b = MDC.putCloseable("log_type", "audit_log")) {
+
+            log.info(journalToString(journal));
+
+        }
+        if (!logsDatabaseProperties.isEnabled()) return;
 
         try {
-            localHostName = InetAddress.getLocalHost().getHostName();
-            localHostAddress = InetAddress.getLocalHost().getHostAddress();
-        } catch (UnknownHostException e) {
-            localHostName = InetAddress.getLoopbackAddress().getHostName();
-            localHostAddress = InetAddress.getLoopbackAddress().getHostAddress();
+            LocalDateTime created = LocalDateTime.parse(journal.getStart(), FORMATTER);
+
+            logRepository.save(new Log(
+                    created,
+                    journalToString(journal),
+                    deviceEventClassID
+            ));
+        } catch (Exception e) {
+            log.error("Ошибка при сохранении лога в БД", e);
         }
+    }
+
+    private SvoiJournal prepareJournalBase() {
+        SvoiJournal journal = journalFactory.getJournalSource();
+
+        HostInfo host = getLocalHostInfo();
+
+        journal.setSrc(host.ip());
+        journal.setShost(host.name());
+        journal.setDhost(host.name());
+        journal.setDst(host.ip());
+        journal.setDvchost(host.name());
+        journal.setDpt(sysProperties.getDpt());
+
+        return journal;
+    }
+
+    private SvoiJournal prepareJournalFromRequest(HttpServletRequest request) {
+        SvoiJournal journal = prepareJournalBase();
+
+        journal.setSrc(request.getRemoteAddr());
+        journal.setShost(request.getRemoteHost());
+        journal.setSpt(request.getRemotePort());
+
+        return journal;
+    }
+
+    private void fillJournalDefaults(SvoiJournal journal,
+                                     String deviceEventClassID,
+                                     String name,
+                                     String message,
+                                     SvoiSeverityEnum severity) {
 
         journal.setDeviceProduct(sysProperties.getName());
         journal.setDeviceVersion(sysProperties.getVersion());
@@ -175,86 +225,47 @@ public class SvoiCustomLogger {
         journal.setApp("");
         journal.setDmac(getMacAddress());
         journal.setSeverity(severity);
+    }
 
-        if (isBlank(journal.getSrc()) || isBlank(journal.getShost())) {
-            journal.setSrc(localHostAddress);
-            journal.setShost(localHostName);
-        }
+    private record HostInfo(String name, String ip) {}
 
-        if (journal.getDpt() == null || journal.getDpt() == 0) {
-            journal.setDpt(sysProperties.getDpt());
-        }
-
-        if (isBlank(journal.getDhost()) || isBlank(journal.getDst())) {
-            journal.setDhost(localHostName);
-            journal.setDst(localHostAddress);
-            journal.setDvchost(localHostName);
-        }
-
-        try (
-                MDC.MDCCloseable hostClosable = MDC.putCloseable("host", journal.getHostForSvoi());
-                MDC.MDCCloseable logTypeClosable = MDC.putCloseable("log_type", "audit_log")
-        ) {
-            log.info(StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"));
-        }
-
-        if (!logsDatabaseProperties.isEnabled()) return;
-
+    private HostInfo getLocalHostInfo() {
         try {
-            LocalDateTime created = LocalDateTime.parse(journal.getStart(), formatter);
-            logRepository.save(new Log(
-                    created,
-                    StringUtils.replace(journal.toString(), "OmniPlatform", "ORD"),
-                    deviceEventClassID
-            ));
+            InetAddress inet = InetAddress.getLocalHost();
+            return new HostInfo(inet.getHostName(), inet.getHostAddress());
         } catch (Exception e) {
-            log.error("Ошибка при сохранении лога в БД", e);
+            InetAddress inet = InetAddress.getLoopbackAddress();
+            return new HostInfo(inet.getHostName(), inet.getHostAddress());
         }
     }
 
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
+    private String journalToString(SvoiJournal journal) {
+        return StringUtils.replace(journal.toString(), "OmniPlatform", "ORD");
     }
 
+    private boolean isIp(String input) {
+        if (input == null) return false;
+        return input.contains(".") || input.contains(":");
+    }
+
+    private String resolveHost(String input) {
+        try {
+            return InetAddress.getByName(input).getHostName();
+        } catch (Exception e) {
+            return "UnableToResolve:" + input;
+        }
+    }
 
     private String getMacAddress() {
-        List<String> addresses = new ArrayList<>();
+        List<String> macs = new ArrayList<>();
         try {
             Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
             while (interfaces.hasMoreElements()) {
-                NetworkInterface ni = interfaces.nextElement();
-                byte[] mac = ni.getHardwareAddress();
+                byte[] mac = interfaces.nextElement().getHardwareAddress();
                 if (mac == null) continue;
-                for (byte b : mac) {
-                    addresses.add(String.format("%02X", b));
-                }
+                for (byte b : mac) macs.add(String.format("%02X", b));
             }
-        } catch (SocketException e) {
-            log.error(e.getMessage(), e);
-        }
-        return String.join(":", addresses);
-    }
-
-    private static boolean isIpAddress(String input) {
-        if (input == null) return false;
-
-        boolean hasDots = input.chars().filter(ch -> ch == '.').count() == 3;
-        boolean hasColons = input.contains(":");
-
-        return hasDots || hasColons;
-    }
-
-    private static String resolveToOpposite(String input) {
-        try {
-            InetAddress inetAddress = InetAddress.getByName(input);
-
-            if (isIpAddress(input)) {
-                return inetAddress.getHostName();
-            } else {
-                return inetAddress.getHostAddress();
-            }
-        } catch (UnknownHostException e) {
-            return "Unable to resolve: " + input;
-        }
+        } catch (Exception ignored) {}
+        return String.join(":", macs);
     }
 }

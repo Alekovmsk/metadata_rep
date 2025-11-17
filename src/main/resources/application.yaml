@@ -104,7 +104,7 @@ management:
 
 sources:
   connections:
-    file-path: file:${CONFIG_DIR:classpath:db-connections.json}
+    file-path: ${CONFIG_DIR:classpath:db-connections.json}
 
 logging:
   cef:

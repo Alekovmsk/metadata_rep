@@ -85,7 +85,7 @@ public class ReplicationServiceImpl implements ReplicationService {
             }
 
             log.info("Репликация завершена успешно для источника {}", serviceName);
-            svoiCustomLogger.send(
+            svoiCustomLogger.sendInternal(
                     "replicationJob",
                     "Replication Finished",
                     String.format("Replicated source: [%s];",
@@ -95,7 +95,7 @@ public class ReplicationServiceImpl implements ReplicationService {
             log.info("Всего реплицировано {} баз данных из источника {}", databases.size(), serviceName);
 
         } catch (SQLException e) {
-            svoiCustomLogger.logAuthError(
+            svoiCustomLogger.logDbConnectionError(
                     source.getHostFromUrl(),
                     source.getDnsFromUrl(),
                     source.getPortFromUrl(),
@@ -110,9 +110,17 @@ public class ReplicationServiceImpl implements ReplicationService {
     }
 
     private void truncateTables(String serviceName) {
+        svoiCustomLogger.sendInternal(
+                "replicationDataReset",
+                "replication Data Reset",
+                "serviceName=" + serviceName,
+                SvoiSeverityEnum.ONE
+        );
+
         databaseRep.deleteByServiceName(serviceName);
         schemaRep.deleteByServiceName(serviceName);
         tableRep.deleteByServiceName(serviceName);
+        log.info("Truncated metadata tables for service={}", serviceName);
     }
 
     private List<String> databaseReplication(SourceDbConnections source) throws SQLException {
