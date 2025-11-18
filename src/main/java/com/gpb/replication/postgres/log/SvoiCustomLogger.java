@@ -62,6 +62,7 @@ public class SvoiCustomLogger {
             journal.setDvchost(dhost);
             journal.setDpt(sourcePort);
             journal.setDuser(duser);
+            journal.setApp("JDBC");
 
             String message = String.format("connectTo%s dns=%s ip=%s port=%d",
                     dbType, dhost, dst, sourcePort);
@@ -82,6 +83,7 @@ public class SvoiCustomLogger {
             journal.setSrc(ip);
             journal.setShost(dns);
             journal.setDpt(port);
+            journal.setApp("JDBC");
 
             String message = String.format(
                     "dbConnectionError connectTo%s user=%s dns=%s ip=%s port=%d error=%s",
@@ -204,6 +206,7 @@ public class SvoiCustomLogger {
         journal.setSrc(request.getRemoteAddr());
         journal.setShost(request.getRemoteHost());
         journal.setSpt(request.getRemotePort());
+        journal.setApp("https");
 
         return journal;
     }
@@ -220,11 +223,23 @@ public class SvoiCustomLogger {
         journal.setDeviceEventClassID(deviceEventClassID);
         journal.setName(name);
         journal.setMessage(message);
-        journal.setDuser(sysProperties.getUser());
-        journal.setSuser(sysProperties.getUser());
-        journal.setApp("");
+        if (journal.getDuser() == null) {
+            journal.setDuser(sysProperties.getUser());
+        }
+        if (journal.getSuser() == null) {
+            journal.setSuser(sysProperties.getUser());
+        }
+        if (journal.getApp() == null) {
+            journal.setApp("TCP");
+        }
         journal.setDmac(getMacAddress());
         journal.setSeverity(severity);
+        if (journal.getSpt() == null) {
+            journal.setSpt(sysProperties.getDpt());
+        }
+        if (journal.getDpt() == null) {
+            journal.setDpt(sysProperties.getDpt());
+        }
     }
 
     private record HostInfo(String name, String ip) {}
