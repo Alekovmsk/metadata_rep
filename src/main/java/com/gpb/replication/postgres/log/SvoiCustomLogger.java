@@ -53,7 +53,7 @@ public class SvoiCustomLogger {
                 dst = sourceHost;
                 dhost = resolveHost(sourceHost);
             } else {
-                dst = resolveHost(sourceHost);
+                dst = resolveIp(sourceHost);
                 dhost = sourceHost;
             }
 
@@ -76,22 +76,37 @@ public class SvoiCustomLogger {
     }
 
     /** Ошибка подключения или авторизации к базе источника */
-    public void logDbConnectionError(String ip, String dns, int port, String dbType, String username, Exception e) {
+    public void logDbConnectionError(String sourceHost,
+                                    int sourcePort,
+                                    String dbType,
+                                    String duser,
+                                    Exception e) {
         try {
             SvoiJournal journal = prepareJournalBase();
 
-            journal.setSrc(ip);
-            journal.setShost(dns);
-            journal.setDpt(port);
+            String dst;
+            String dhost;
+            if (isIp(sourceHost)) {
+                dst = sourceHost;
+                dhost = resolveHost(sourceHost);
+            } else {
+                dst = resolveIp(sourceHost);
+                dhost = sourceHost;
+            }
+
+            journal.setDhost(dhost);
+            journal.setDst(dst);
+            journal.setDvchost(dhost);
+            journal.setDpt(sourcePort);
+            journal.setDuser(duser);
             journal.setApp("JDBC");
 
             String message = String.format(
-                    "dbConnectionError connectTo%s user=%s dns=%s ip=%s port=%d error=%s",
+                    "dbConnectionError connectTo%s user=%s hostname=%s port=%d error=%s",
                     dbType,
-                    username,
-                    dns,
-                    ip,
-                    port,
+                    duser,
+                    dhost,
+                    sourcePort,
                     (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
             );
 
@@ -115,7 +130,7 @@ public class SvoiCustomLogger {
                 extendedMessage += " serviceName=" + dto.getServiceName();
             }
 
-            send("metadataSyncApi",
+            send("apiCall",
                     "Metadata Synchronization Request",
                     extendedMessage,
                     SvoiSeverityEnum.ONE,
@@ -266,6 +281,14 @@ public class SvoiCustomLogger {
     private String resolveHost(String input) {
         try {
             return InetAddress.getByName(input).getHostName();
+        } catch (Exception e) {
+            return "UnableToResolve:" + input;
+        }
+    }
+
+    private String resolveIp(String input) {
+        try {
+            return InetAddress.getByName(input).getHostAddress();
         } catch (Exception e) {
             return "UnableToResolve:" + input;
         }

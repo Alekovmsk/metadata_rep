@@ -80,7 +80,19 @@ public class ReplicationServiceImpl implements ReplicationService {
             List<String> databases = databaseReplication(source);
 
             for (String dbName : databases) {
-                schemaReplication(source, dbName);
+                try {
+                    schemaReplication(source, dbName);
+                } catch (SQLException e) {
+                    svoiCustomLogger.logDbConnectionError(
+                            source.getHostFromUrl(),
+                            source.getPortFromUrl(),
+                            source.getDbType(),
+                            source.getUsername(),
+                            e
+                    );
+                    continue;
+                }
+                
                 tableReplication(source, dbName);
             }
 
@@ -97,7 +109,6 @@ public class ReplicationServiceImpl implements ReplicationService {
         } catch (SQLException e) {
             svoiCustomLogger.logDbConnectionError(
                     source.getHostFromUrl(),
-                    source.getDnsFromUrl(),
                     source.getPortFromUrl(),
                     source.getDbType(),
                     source.getUsername(),
@@ -154,7 +165,8 @@ public class ReplicationServiceImpl implements ReplicationService {
             log.info("Реплицировано {} DB Postgres для {}", databases.size(), source.getServiceName());
 
         } catch (SQLException e) {
-            log.error("Ошибка при подключении и получении DB из Postgres для {}: {}", source.getName(), e.getMessage(), e);
+            log.error("Ошибка при подключении и получении DB из Postgres для {}: {}", 
+                    source.getName(), e.getMessage(), e);
             throw e;
         }
         return databases;
@@ -191,12 +203,13 @@ public class ReplicationServiceImpl implements ReplicationService {
             schemaRep.saveAll(schemas);
             log.info("Реплицировано {} схем Postgres для DB {}", schemas.size(), dbName);
         } catch (SQLException e) {
-            log.error("Ошибка при подключении и получении схем Postgres для {}: {}", dbName, e.getMessage(), e);
+            log.error("Ошибка при подключении и получении схем Postgres для {}: {}", 
+                    dbName, e.getMessage(), e);
             throw e;
         }
     }
 
-    private void tableReplication(SourceDbConnections source, String dbName) throws SQLException {
+    private void tableReplication(SourceDbConnections source, String dbName) {
         String url = buildDbUrl(source.getUrl(), dbName);
         LocalDateTime currentTime = LocalDateTime.now();
 
@@ -240,8 +253,8 @@ public class ReplicationServiceImpl implements ReplicationService {
             tableRep.saveAll(entities);
 
         } catch (SQLException e) {
-            log.error("Ошибка при получении таблиц для {}: {}", source.getName(), e.getMessage(), e);
-            throw e;
+            log.error("Ошибка при получении таблиц для {}: {}", 
+                    source.getName(), e.getMessage(), e);
         }
     }
 

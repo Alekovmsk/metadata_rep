@@ -29,7 +29,7 @@ public class SourceDbConnections implements Serializable {
     public String getHostFromUrl() {
         if (url == null) return "unknown-host";
         try {
-            Pattern pattern = Pattern.compile("@/?/?([^:/]+)");
+            Pattern pattern = Pattern.compile("://([^:/]+)");
             Matcher matcher = pattern.matcher(url);
             return matcher.find() ? matcher.group(1) : "unknown-host";
         } catch (Exception e) {
