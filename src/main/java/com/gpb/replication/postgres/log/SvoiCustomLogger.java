@@ -141,11 +141,33 @@ public class SvoiCustomLogger {
         }
     }
 
+    public void logAuth(String ip, String username) {
+        try {
+            SvoiJournal journal = prepareJournalBase();
+            journal.setSrc(ip);
+            journal.setShost(ip);
+            journal.setSuser(username);
+
+            String message = String.format(
+                    "Authenticated user=%s ip=%s",
+                    username != null ? username : "unknown",
+                    ip
+            );
+
+            send("authSuccess", "Invalid Login or Password", message,
+                    SvoiSeverityEnum.FIVE, journal);
+
+        } catch (Exception ex) {
+            log.error("Ошибка при логировании неверных учётных данных", ex);
+        }
+    }
+
     public void logBadCredentials(String ip, String username, String endpoint) {
         try {
             SvoiJournal journal = prepareJournalBase();
             journal.setSrc(ip);
             journal.setShost(ip);
+            journal.setSuser(username);
 
             String message = String.format(
                     "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
