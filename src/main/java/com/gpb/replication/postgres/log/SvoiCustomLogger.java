@@ -64,7 +64,7 @@ public class SvoiCustomLogger {
             journal.setDuser(duser);
             journal.setApp("JDBC");
 
-            String message = String.format("connectTo%s dns=%s ip=%s port=%d",
+            String message = String.format("connectTo%s dns: %s; ip: %s; port: %d;",
                     dbType, dhost, dst, sourcePort);
 
             send("connectToSource", "Database Connection", message,
@@ -102,7 +102,7 @@ public class SvoiCustomLogger {
             journal.setApp("JDBC");
 
             String message = String.format(
-                    "dbConnectionError connectTo%s user=%s hostname=%s port=%d error=%s",
+                    "dbConnectionError connectTo%s user: %s; hostname: %s; port: %d; error: %s;",
                     dbType,
                     duser,
                     dhost,
@@ -127,7 +127,7 @@ public class SvoiCustomLogger {
 
             String extendedMessage = message;
             if (dto != null && dto.getServiceName() != null) {
-                extendedMessage += " serviceName=" + dto.getServiceName();
+                extendedMessage += " serviceName: " + dto.getServiceName() + ";";
             }
 
             send("apiCall",
@@ -149,7 +149,7 @@ public class SvoiCustomLogger {
             journal.setSuser(username);
 
             String message = String.format(
-                    "Authenticated user=%s ip=%s",
+                    "Authenticated user: %s; ip: %s;",
                     username != null ? username : "unknown",
                     ip
             );
@@ -170,7 +170,7 @@ public class SvoiCustomLogger {
             journal.setSuser(username);
 
             String message = String.format(
-                    "authFailed invalidCredentials user=%s endpoint=%s ip=%s",
+                    "authFailed invalidCredentials user: %s; endpoint: %s; ip: %s;",
                     username != null ? username : "unknown",
                     endpoint,
                     ip
