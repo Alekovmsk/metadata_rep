@@ -17,7 +17,6 @@ import java.util.Base64;
 @Component
 @RequiredArgsConstructor
 public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint {
-
     private final SvoiCustomLogger svoiLogger;
 
     @Override
@@ -33,12 +32,10 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
         String username = extractUsername(request.getHeader("Authorization"));
 
         if (authException instanceof BadCredentialsException) {
-
             log.warn("Ошибка авторизации: неверный логин или пароль. User: {}, Endpoint: {}, IP: {}",
                     username, endpoint, clientIp);
 
             svoiLogger.logBadCredentials(clientIp, username, endpoint);
-
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                     "Invalid username or password");
 
@@ -47,7 +44,6 @@ public class CustomAuthenticationEntryPoint implements AuthenticationEntryPoint 
                     authException.getMessage(), username, endpoint, clientIp);
 
             svoiLogger.logBadCredentials(clientIp, username, endpoint);
-
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED,
                     "Authentication failed");
         }

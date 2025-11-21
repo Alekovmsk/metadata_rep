@@ -28,12 +28,9 @@ public class SysProperties {
 
     @PostConstruct
     public void init() {
-        // Инициализация user
         if (this.user == null) {
             this.user = System.getProperty("user.name");
         }
-        
-        // Инициализация host и ip
         try {
             this.host = InetAddress.getLocalHost().getHostName();
             this.ip = InetAddress.getLocalHost().getHostAddress();

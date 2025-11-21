@@ -10,14 +10,8 @@
         <version>3.5.6</version>
         <relativePath/>
     </parent>
-
-    <groupId>com.gpb.replication</groupId>
-    <artifactId>postgres-replication</artifactId>
-    <version>${app.version}</version>
-    <name>postgres-replication</name>
-    <description>PostgreSQL replication</description>
-
     <properties>
+        <app.version>0.0.1</app.version>
         <java.version>17</java.version>
         <flink.version>1.17.1</flink.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
@@ -26,6 +20,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <netty.version>4.1.100.Final</netty.version>
     </properties>
+
+    <groupId>com.gpb.replication</groupId>
+    <artifactId>postgres-replication</artifactId>
+    <version>${app.version}</version>
+    <name>postgres-replication</name>
+    <description>PostgreSQL replication</description>
 
     <build>
         <plugins>
@@ -37,7 +37,8 @@
     </build>
 
     <dependencies>
-        <!-- Spring Boot starters -->
+
+        <!-- Spring -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
@@ -51,7 +52,6 @@
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
-
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-vault-config</artifactId>
@@ -65,16 +65,36 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-core</artifactId>
+            <version>6.5.4</version>
+        </dependency>
 
+        <!-- tomcat -->
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>10.1.44</version>
+        </dependency>
+
+        <!-- codec -->
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
             <version>1.15</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
         <!-- Логирование -->
@@ -89,7 +109,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
-            <version>1.26.1</version> <!-- Проверьте актуальную версию -->
+            <version>1.26.1</version>
         </dependency>
 
         <!-- Database -->
@@ -115,7 +135,7 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>9.16.0</version> <!-- или выше -->
+            <version>9.16.0</version>
         </dependency>
 
         <!-- Testing -->
@@ -144,16 +164,6 @@
             <version>2.3.0</version>
         </dependency>
 
-        <!-- web -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-security</artifactId>
-        </dependency>
-
         <!-- Указание точных версий без уязвимостей -->
         <dependency>
             <groupId>io.netty</groupId>
@@ -175,16 +185,7 @@
             <artifactId>netty-codec-http2</artifactId>
             <version>${netty.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-core</artifactId>
-            <version>6.5.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-            <version>10.1.44</version>
-        </dependency>
+
     </dependencies>
 
 </project>

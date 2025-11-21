@@ -3,10 +3,8 @@ package com.gpb.replication.postgres;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -37,7 +35,6 @@ public class ReplicationApplication {
     private final LogPartitionRepository logPartitionRepository;
     private final LogRepository logRepository;
     private final ConfigurableEnvironment configurableEnvironment;
-    private static ConfigurableApplicationContext applicationContext;
 
     @PostConstruct
     public void startupApplication() {
@@ -80,15 +77,5 @@ public class ReplicationApplication {
     @PreDestroy
     public void shutdownApplication() {
         svoiCustomLogger.sendInternal("stopService", "Stop Service", "Stopped service", SvoiSeverityEnum.ONE);
-    }
-
-    public static void restart() {
-        ApplicationArguments args = applicationContext.getBean(ApplicationArguments.class);
-        Thread thread = new Thread(() -> {
-            applicationContext.close();
-            applicationContext = SpringApplication.run(ReplicationApplication.class, args.getSourceArgs());
-        });
-        thread.setDaemon(false);
-        thread.start();
     }
 }

@@ -16,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @Slf4j
 public class VaultSecretService {
-
     private final VaultTemplate vaultTemplate;
     private final String basePath;
 
@@ -42,6 +41,7 @@ public class VaultSecretService {
                 Map<String, Object> data = (Map<String, Object>) response.getData().get("data");
                 if (data != null) {
                     ObjectMapper mapper = new ObjectMapper();
+
                     // Настройка для обработки примитивных типов
                     mapper.configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, false);
                     mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);

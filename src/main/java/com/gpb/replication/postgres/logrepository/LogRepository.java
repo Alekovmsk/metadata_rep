@@ -13,7 +13,6 @@ import java.sql.Timestamp;
 @Repository
 @Slf4j
 public class LogRepository {
-
     private final JdbcTemplate logsJdbcTemplate;
     private final CefLogFileService cefLogFileService;
     private final LogsDatabaseProperties logsDatabaseProperties;

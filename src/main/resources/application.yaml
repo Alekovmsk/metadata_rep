@@ -10,6 +10,7 @@
 #       TLS_DHE_RSA_WITH_AES_256_GCM_SHA384,
 #       TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,
 #       TLS_DHE_RSA_WITH_AES_256_CBC_SHA256
+
 spring:
   application:
     name: postgres-replication-service
@@ -20,9 +21,9 @@ spring:
     host: test_dns
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:kampus}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/bd?currentSchema=schema}
+    username: ${DB_USER:user}
+    password: ${DB_PASSWORD:password}
     driverClassName: org.postgresql.Driver
     defaultSchema: postgres_metadata
     hikari:
@@ -44,9 +45,9 @@ spring:
     schemas: postgres_metadata
     enabled: true
     locations: classpath:db/migration
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=postgres_metadata}
-    user: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:kampus}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/meta_base?currentSchema=schema}
+    user: ${DB_USER:user}
+    password: ${DB_PASSWORD:password}
 
   tomcat:
     max-connections: 100 # Максимальное количество соединений
@@ -77,9 +78,9 @@ spring:
 logs-database:
   enabled: true
   task-create-partition: 0 0 0 * * ?
-  url: jdbc:postgresql://localhost:5432/db_log
-  username: postgres
-  password: kampus
+  url: ${DB_LOG_URL:jdbc:postgresql://localhost:5432/bd?currentSchema=schema}
+  username: ${DB_LOG_USER:user}
+  password: ${DB_LOG_PASSWORD:password}
   driverClassName: org.postgresql.Driver
   table: "audit.jdata_postgres_log"
 

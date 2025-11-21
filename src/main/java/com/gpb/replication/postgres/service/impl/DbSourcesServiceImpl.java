@@ -22,15 +22,11 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class DbSourcesServiceImpl implements DbSourcesService {
-
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ResourceLoader resourceLoader;
 
     @Value("${sources.connections.file-path:classpath:db-connections.json}")
     private String filePath;
-
-    @Value("${sources.connections.fallback-to-classpath:true}")
-    private boolean fallbackToClasspath;
 
     @Override
     public List<SourceDbConnections> getDbConnections() {

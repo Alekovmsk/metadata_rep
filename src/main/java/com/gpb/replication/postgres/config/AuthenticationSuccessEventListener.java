@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @Slf4j
 public class AuthenticationSuccessEventListener implements ApplicationListener<AuthenticationSuccessEvent> {
-
     private final SvoiCustomLogger svoiLogger;
 
     @Override

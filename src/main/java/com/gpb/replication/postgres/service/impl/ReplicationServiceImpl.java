@@ -38,11 +38,10 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class ReplicationServiceImpl implements ReplicationService {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final DbSourcesService dbSourcesService;
     private final SvoiCustomLogger svoiCustomLogger;
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final DatabaseMetadataRepository databaseRep;
     private final SchemaMetadataRepository schemaRep;
     private final TableMetadataRepository tableRep;
@@ -188,7 +187,6 @@ public class ReplicationServiceImpl implements ReplicationService {
                 String fqn = getFqn(List.of(source.getServiceName(), dbName, schemaName));
                 String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
 
-
                 SchemaMetadata schema = new SchemaMetadata();
                 schema.setId(new EntityId(oid, parentFqn));
                 schema.setFqn(fqn);
@@ -224,7 +222,6 @@ public class ReplicationServiceImpl implements ReplicationService {
                     TableMetadata table = new TableMetadata();
                     String fqn = getFqn(List.of(source.getServiceName(), dbName, rs.getString("schema_name"), rs.getString("table_name")));
                     String parentFqn = fqn.substring(0, fqn.lastIndexOf("."));
-
                     EntityId id = new EntityId(rs.getLong("oid"), parentFqn);
 
                     table.setId(id);

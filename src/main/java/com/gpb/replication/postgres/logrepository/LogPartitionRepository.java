@@ -17,11 +17,9 @@ import java.util.List;
 @Slf4j
 @Repository
 public class LogPartitionRepository {
-
     private final JdbcTemplate logsJdbcTemplate;
     private final CleanDatabaseLogsProperties cleanDatabaseLogs;
     private final LogsDatabaseProperties logsDatabaseProperties;
-
     private final SvoiCustomLogger svoiCustomLogger;
 
     public LogPartitionRepository(
