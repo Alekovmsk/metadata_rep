@@ -16,6 +16,7 @@ public class ExecutionTimeAspect {
             "!within(com.gpb.replication.postgres.service.CefLogFileService) && " +
             "!within(com.gpb.replication.postgres.service.KeycloakAuthService) && " +
             "!within(com.gpb.replication.postgres.service.CustomAuthenticationEntryPoint) && " +
+            "!within(com.gpb.replication.postgres.service.VaultSecretService) && " +
             "!within(com.gpb.replication.postgres.service.CustomUserDetailsService)")
     public Object logExecutionTime(ProceedingJoinPoint joinPoint) throws Throwable {
         long startTime = System.currentTimeMillis();
